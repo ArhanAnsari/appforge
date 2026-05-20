@@ -1,0 +1,324 @@
+{
+	"Project Initialization - Client": {
+		"prefix": "awclient",
+		"body": [
+			"const client = new Client()",
+			"\t.setEndpoint(\"${1:endpoint}\")",
+			"\t.setProject(\"${2:projectId}\");"
+		],
+		"description": "Creates Appwrite client with endpoint and project ID",
+		"scope": "javascript,typescript"
+	},
+	"Project Initialization - Full Setup": {
+		"prefix": "awinit",
+		"body": [
+			"import { Client, Databases } from \"appwrite\";",
+			"",
+			"const client = new Client();",
+			"",
+			"client",
+			"\t.setEndpoint(\"${1:endpoint}\")",
+			"\t.setProject(\"${2:projectId}\");",
+			"",
+			"const databases = new Databases(client);"
+		],
+		"description": "Full Appwrite initialization with client and databases",
+		"scope": "javascript,typescript"
+	},
+	"Database - Create Database Instance": {
+		"prefix": "awdb",
+		"body": [
+			"const databases = new Databases(client);",
+			"",
+			"const database = await databases.create(",
+			"\t\"${1:databaseId}\",",
+			"\t\"${2:databaseName}\"",
+			");"
+		],
+		"description": "Create database instance",
+		"scope": "javascript,typescript"
+	},
+	"Database - Create Collection": {
+		"prefix": "awc",
+		"body": [
+			"const collection = await databases.createCollection(",
+			"\t\"${1:databaseId}\",",
+			"\t\"${2:collectionId}\",",
+			"\t\"${3:collectionName}\"",
+			");"
+		],
+		"description": "Create collection in database",
+		"scope": "javascript,typescript"
+	},
+	"Database - Create Attribute": {
+		"prefix": "awattr",
+		"body": [
+			"const attribute = await databases.createStringAttribute(",
+			"\t\"${1:databaseId}\",",
+			"\t\"${2:collectionId}\",",
+			"\t\"${3:attributeName}\",",
+			"\t${4:256},",
+			"\t${5:true}",
+			");"
+		],
+		"description": "Create attribute in collection",
+		"scope": "javascript,typescript"
+	},
+	"Database - Create Index": {
+		"prefix": "awindex",
+		"body": [
+			"const index = await databases.createIndex(",
+			"\t\"${1:databaseId}\",",
+			"\t\"${2:collectionId}\",",
+			"\t\"${3:indexKey}\",",
+			"\t\"${4:key}\"",
+			");"
+		],
+		"description": "Create index on collection attribute",
+		"scope": "javascript,typescript"
+	},
+	"Database - Create Document": {
+		"prefix": "awdoc",
+		"body": [
+			"const document = await databases.createDocument(",
+			"\t\"${1:databaseId}\",",
+			"\t\"${2:collectionId}\",",
+			"\tID.unique(),",
+			"\t{",
+			"\t\t${3:field}: \"${4:value}\"",
+			"\t}",
+			");"
+		],
+		"description": "Create document in collection",
+		"scope": "javascript,typescript"
+	},
+	"Database - Get Document": {
+		"prefix": "awgetdoc",
+		"body": [
+			"const document = await databases.getDocument(",
+			"\t\"${1:databaseId}\",",
+			"\t\"${2:collectionId}\",",
+			"\t\"${3:documentId}\"",
+			");"
+		],
+		"description": "Get document by ID",
+		"scope": "javascript,typescript"
+	},
+	"Database - List Documents": {
+		"prefix": "awlistdoc",
+		"body": [
+			"const documents = await databases.listDocuments(",
+			"\t\"${1:databaseId}\",",
+			"\t\"${2:collectionId}\"",
+			");"
+		],
+		"description": "List documents in collection",
+		"scope": "javascript,typescript"
+	},
+	"Database - Update Document": {
+		"prefix": "awupdatedoc",
+		"body": [
+			"const updated = await databases.updateDocument(",
+			"\t\"${1:databaseId}\",",
+			"\t\"${2:collectionId}\",",
+			"\t\"${3:documentId}\",",
+			"\t{",
+			"\t\t${4:field}: \"${5:newValue}\"",
+			"\t}",
+			");"
+		],
+		"description": "Update document fields",
+		"scope": "javascript,typescript"
+	},
+	"Database - Delete Document": {
+		"prefix": "awdeletedoc",
+		"body": [
+			"await databases.deleteDocument(",
+			"\t\"${1:databaseId}\",",
+			"\t\"${2:collectionId}\",",
+			"\t\"${3:documentId}\"",
+			");"
+		],
+		"description": "Delete document from collection",
+		"scope": "javascript,typescript"
+	},
+	"Auth - Account Instance": {
+		"prefix": "awaccount",
+		"body": [
+			"import { Account } from \"appwrite\";",
+			"",
+			"const account = new Account(client);"
+		],
+		"description": "Create account instance",
+		"scope": "javascript,typescript"
+	},
+	"Auth - Create Account": {
+		"prefix": "awsignup",
+		"body": [
+			"const user = await account.create(",
+			"\tID.unique(),",
+			"\t\"${1:email}@example.com\",",
+			"\t\"${2:password}\"",
+			");"
+		],
+		"description": "Create new user account",
+		"scope": "javascript,typescript"
+	},
+	"Auth - Email Password Login": {
+		"prefix": "awlogin",
+		"body": [
+			"const session = await account.createEmailSession(",
+			"\t\"${1:email}@example.com\",",
+			"\t\"${2:password}\"",
+			");"
+		],
+		"description": "Login with email and password",
+		"scope": "javascript,typescript"
+	},
+	"Auth - Logout": {
+		"prefix": "awlogout",
+		"body": [
+			"await account.deleteSession(\"current\");"
+		],
+		"description": "Delete current session (logout)",
+		"scope": "javascript,typescript"
+	},
+	"Auth - Get Session": {
+		"prefix": "awsession",
+		"body": [
+			"const session = await account.get();"
+		],
+		"description": "Get current user session",
+		"scope": "javascript,typescript"
+	},
+	"Functions - Function Instance": {
+		"prefix": "awfn",
+		"body": [
+			"import { Functions } from \"appwrite\";",
+			"",
+			"const functions = new Functions(client);"
+		],
+		"description": "Create functions instance",
+		"scope": "javascript,typescript"
+	},
+	"Functions - Execute Function": {
+		"prefix": "awexec",
+		"body": [
+			"const execution = await functions.createExecution(",
+			"\t\"${1:functionId}\",",
+			"\t\"${2:data}\"",
+			");"
+		],
+		"description": "Execute serverless function",
+		"scope": "javascript,typescript"
+	},
+	"Functions - Deploy Function": {
+		"prefix": "awdeploy",
+		"body": [
+			"// Deploy function from local folder",
+			"// Use AppForge: Deploy Function from command palette"
+		],
+		"description": "Deploy function template",
+		"scope": "javascript,typescript"
+	},
+	"Storage - Storage Instance": {
+		"prefix": "awstorage",
+		"body": [
+			"import { Storage } from \"appwrite\";",
+			"",
+			"const storage = new Storage(client);"
+		],
+		"description": "Create storage instance",
+		"scope": "javascript,typescript"
+	},
+	"Storage - Upload File": {
+		"prefix": "awupload",
+		"body": [
+			"const file = await storage.createFile(",
+			"\t\"${1:bucketId}\",",
+			"\tID.unique(),",
+			"\tnew File([\"${2:content}\"], \"${3:filename}\")",
+			");"
+		],
+		"description": "Upload file to storage bucket",
+		"scope": "javascript,typescript"
+	},
+	"Storage - Delete File": {
+		"prefix": "awdeletefile",
+		"body": [
+			"await storage.deleteFile(",
+			"\t\"${1:bucketId}\",",
+			"\t\"${2:fileId}\"",
+			");"
+		],
+		"description": "Delete file from storage bucket",
+		"scope": "javascript,typescript"
+	},
+	"Teams - Create Team": {
+		"prefix": "awteam",
+		"body": [
+			"import { Teams } from \"appwrite\";",
+			"",
+			"const teams = new Teams(client);",
+			"",
+			"const team = await teams.create(",
+			"\tID.unique(),",
+			"\t\"${1:teamName}\"",
+			");"
+		],
+		"description": "Create team",
+		"scope": "javascript,typescript"
+	},
+	"Queries - Equal Query": {
+		"prefix": "awqueryeq",
+		"body": [
+			"import { Query } from \"appwrite\";",
+			"",
+			"const documents = await databases.listDocuments(",
+			"\t\"${1:databaseId}\",",
+			"\t\"${2:collectionId}\",",
+			"\t[Query.equal(\"${3:field}\", \"${4:value}\")]",
+			");"
+		],
+		"description": "Query documents with equal filter",
+		"scope": "javascript,typescript"
+	},
+	"Queries - Limit Query": {
+		"prefix": "awquerylimit",
+		"body": [
+			"import { Query } from \"appwrite\";",
+			"",
+			"const documents = await databases.listDocuments(",
+			"\t\"${1:databaseId}\",",
+			"\t\"${2:collectionId}\",",
+			"\t[Query.limit(${3:10})]",
+			");"
+		],
+		"description": "Query documents with limit",
+		"scope": "javascript,typescript"
+	},
+	"Queries - Order Descending": {
+		"prefix": "awqueryorder",
+		"body": [
+			"import { Query } from \"appwrite\";",
+			"",
+			"const documents = await databases.listDocuments(",
+			"\t\"${1:databaseId}\",",
+			"\t\"${2:collectionId}\",",
+			"\t[Query.orderDesc(\"${3:field}\")]",
+			");"
+		],
+		"description": "Query documents ordered descending",
+		"scope": "javascript,typescript"
+	},
+	"Utility - Generate Unique ID": {
+		"prefix": "awid",
+		"body": [
+			"import { ID } from \"appwrite\";",
+			"",
+			"const uniqueId = ID.unique();"
+		],
+		"description": "Generate unique ID for documents",
+		"scope": "javascript,typescript"
+	}
+}

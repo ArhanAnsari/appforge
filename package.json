@@ -1,0 +1,230 @@
+{
+  "name": "appforge",
+  "displayName": "AppForge",
+  "description": "AppForge is an Appwrite-native developer cockpit inside VS Code. Manage projects, databases, functions, and logs without leaving your editor.",
+  "version": "0.1.0-alpha",
+  "publisher": "appforge",
+  "author": "AppForge Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/appforge/appforge-vscode"
+  },
+  "keywords": [
+    "appwrite",
+    "backend",
+    "database",
+    "serverless",
+    "functions"
+  ],
+  "engines": {
+    "vscode": "^1.120.0"
+  },
+  "categories": [
+    "Backend",
+    "Appwrite",
+    "Snippets",
+    "Other"
+  ],
+  "activationEvents": [
+    "workspaceContains:.appforge"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "appforge-explorer",
+          "title": "AppForge",
+          "icon": "assets/appforge.png"
+        }
+      ]
+    },
+    "views": {
+      "appforge-explorer": [
+        {
+          "id": "appforge.projectView",
+          "name": "Projects",
+          "when": "true"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "appforge.addProject",
+        "title": "AppForge: Add Project",
+        "category": "AppForge"
+      },
+      {
+        "command": "appforge.removeProject",
+        "title": "AppForge: Remove Project",
+        "category": "AppForge"
+      },
+      {
+        "command": "appforge.switchProject",
+        "title": "AppForge: Switch Project",
+        "category": "AppForge"
+      },
+      {
+        "command": "appforge.refreshProjects",
+        "title": "AppForge: Refresh Projects",
+        "category": "AppForge",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "appforge.refreshDatabases",
+        "title": "AppForge: Refresh Databases",
+        "category": "AppForge",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "appforge.createDocument",
+        "title": "AppForge: Create Document",
+        "category": "AppForge"
+      },
+      {
+        "command": "appforge.deleteDocument",
+        "title": "AppForge: Delete Document",
+        "category": "AppForge"
+      },
+      {
+        "command": "appforge.listDocuments",
+        "title": "AppForge: List Documents",
+        "category": "AppForge"
+      },
+      {
+        "command": "appforge.updateDocument",
+        "title": "AppForge: Update Document",
+        "category": "AppForge"
+      },
+      {
+        "command": "appforge.executeFunction",
+        "title": "AppForge: Execute Function",
+        "category": "AppForge"
+      },
+      {
+        "command": "appforge.deployFunction",
+        "title": "AppForge: Deploy Function",
+        "category": "AppForge"
+      },
+      {
+        "command": "appforge.viewLogs",
+        "title": "AppForge: View Logs",
+        "category": "AppForge"
+      },
+      {
+        "command": "appforge.showSetupGuide",
+        "title": "AppForge: Show Setup Guide",
+        "category": "AppForge",
+        "icon": "$(book)"
+      },
+      {
+        "command": "appforge.checkProjectStatus",
+        "title": "AppForge: Check Project Status",
+        "category": "AppForge"
+      },
+      {
+        "command": "appforge.viewConnectionInfo",
+        "title": "AppForge: View Connection Info",
+        "category": "AppForge"
+      },
+      {
+        "command": "appforge.createDatabase",
+        "title": "AppForge: Create Database",
+        "category": "AppForge",
+        "icon": "$(add)"
+      },
+      {
+        "command": "appforge.deleteDatabase",
+        "title": "AppForge: Delete Database",
+        "category": "AppForge",
+        "icon": "$(trash)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "appforge.refreshProjects",
+          "when": "view == appforge.projectView",
+          "group": "navigation"
+        },
+        {
+          "command": "appforge.addProject",
+          "when": "view == appforge.projectView",
+          "group": "navigation",
+          "icon": "$(add)"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "appforge.switchProject",
+          "when": "viewItem == project",
+          "group": "1_modification"
+        },
+        {
+          "command": "appforge.removeProject",
+          "when": "viewItem == project",
+          "group": "1_modification"
+        },
+        {
+          "command": "appforge.refreshDatabases",
+          "when": "viewItem == databases",
+          "group": "1_modification",
+          "icon": "$(refresh)"
+        },
+        {
+          "command": "appforge.createDatabase",
+          "when": "viewItem == databases || viewItem == project",
+          "group": "1_modification"
+        },
+        {
+          "command": "appforge.deleteDatabase",
+          "when": "viewItem == database",
+          "group": "1_modification"
+        }
+      ]
+    },
+    "snippets": [
+      {
+        "language": "javascript",
+        "path": "./snippets/appwrite.code-snippets"
+      },
+      {
+        "language": "typescript",
+        "path": "./snippets/appwrite.code-snippets"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && npm run lint && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "npm run check-types && npm run lint && node esbuild.js --production",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "dependencies": {
+    "assert": "^2.1.0",
+    "node-appwrite": "^13.0.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.19.19",
+    "@types/vscode": "^1.120.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
+    "esbuild": "^0.27.3",
+    "eslint": "^9.39.3",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1"
+  }
+}
