@@ -7,6 +7,8 @@ import * as vscode from "vscode";
 import { AppwriteClientService } from "../services/appwriteClientService";
 import { AppForgeTreeDataProvider } from "../providers/treeDataProvider";
 import { ProjectStorageService } from "../services/projectStorageService";
+import { EventBus } from "../core/events/eventBus";
+import { outputChannel } from "../core/output/outputChannel";
 import { ID } from "node-appwrite";
 
 /**
@@ -113,23 +115,39 @@ async function createDatabaseCommand(
       },
       async () => {
         try {
+          const end = outputChannel.startOperation(
+            "DATABASE",
+            `Create database: ${databaseName}`,
+          );
           const databases = appwriteClient.getDatabases();
           const db = await databases.create(databaseId, databaseName);
 
+          const activeProject = appwriteClient.getActiveProject();
+          if (activeProject) {
+            await EventBus.getInstance().emit("database.created", {
+              projectId: activeProject.projectId,
+              databaseId,
+              name: databaseName,
+            });
+          }
+
           treeProvider.refresh();
-          vscode.window.showInformationMessage(
-            `✓ Database created: ${databaseName}`,
+          outputChannel.success(
+            "DATABASE",
+            `Database created: ${databaseName}`,
           );
+          end(true);
         } catch (error) {
-          const message =
-            error instanceof Error ? error.message : String(error);
+          outputChannel.error("DATABASE", "Failed to create database", error);
           vscode.window.showErrorMessage(
-            `Failed to create database: ${message}`,
+            `Failed to create database: ${error instanceof Error ? error.message : String(error)}`,
           );
+          end(false, error as Error);
         }
       },
     );
   } catch (error) {
+    outputChannel.error("DATABASE", "Create database error", error);
     const message = error instanceof Error ? error.message : String(error);
     vscode.window.showErrorMessage(`Error: ${message}`);
   }
@@ -170,24 +188,40 @@ async function deleteDatabaseCommand(
       },
       async () => {
         try {
+          const end = outputChannel.startOperation(
+            "DATABASE",
+            `Delete database: ${databaseId}`,
+          );
           const databases = appwriteClient.getDatabases();
           await databases.delete(databaseId);
 
+          const activeProject = appwriteClient.getActiveProject();
+          if (activeProject) {
+            await EventBus.getInstance().emit("database.deleted", {
+              projectId: activeProject.projectId,
+              databaseId,
+            });
+          }
+
           treeProvider.refresh();
-          vscode.window.showInformationMessage(
-            `✓ Database deleted: ${databaseId}`,
-          );
+          outputChannel.success("DATABASE", `Database deleted: ${databaseId}`);
+          end(true);
         } catch (error) {
-          const message =
-            error instanceof Error ? error.message : String(error);
+          outputChannel.error("DATABASE", "Failed to delete database", error);
           vscode.window.showErrorMessage(
-            `Failed to delete database: ${message}`,
+            `Failed to delete database: ${error instanceof Error ? error.message : String(error)}`,
           );
+          end(false, error as Error);
         }
       },
     );
   } catch (error) {
+    outputChannel.error("DATABASE", "Delete database error", error);
     const message = error instanceof Error ? error.message : String(error);
     vscode.window.showErrorMessage(`Error: ${message}`);
   }
 }
+function end(arg0: boolean, arg1: Error) {
+  throw new Error("Function not implemented.");
+}
+

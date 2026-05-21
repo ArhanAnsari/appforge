@@ -9,6 +9,8 @@ import { AppwriteClientService } from "../services/appwriteClientService";
 import { AppForgeTreeDataProvider } from "../providers/treeDataProvider";
 import { SetupGuidePanel } from "../views/setupGuidePanel";
 import { ProjectSetupPanel } from "../views/projectSetupPanel";
+import { EventBus } from "../core/events/eventBus";
+import { outputChannel } from "../core/output/outputChannel";
 
 /**
  * Register project management commands
@@ -69,7 +71,7 @@ export function registerProjectCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand("appforge.refreshProjects", async () => {
       treeProvider.refresh();
-      vscode.window.showInformationMessage("Projects refreshed");
+      outputChannel.success("PROJECTS", "Projects refreshed");
     }),
   );
 
@@ -131,6 +133,10 @@ async function removeProjectCommand(
         cancellable: false,
       },
       async () => {
+        const end = outputChannel.startOperation(
+          "PROJECTS",
+          `Remove project: ${project.projectName}`,
+        );
         await projectStorage.removeProject(projectId);
 
         // If this was the active project, reset client
@@ -139,13 +145,16 @@ async function removeProjectCommand(
         }
 
         treeProvider.refresh();
+        end(true);
       },
     );
 
-    vscode.window.showInformationMessage(
-      `✓ Project "${project.projectName}" removed`,
+    outputChannel.success(
+      "PROJECTS",
+      `Project removed: ${project.projectName}`,
     );
   } catch (error) {
+    outputChannel.error("PROJECTS", "Failed to remove project", error);
     vscode.window.showErrorMessage(
       `Failed to remove project: ${error instanceof Error ? error.message : "Unknown error"}`,
     );
@@ -175,6 +184,10 @@ async function switchProjectCommand(
         cancellable: false,
       },
       async () => {
+        const end = outputChannel.startOperation(
+          "PROJECTS",
+          `Switch to project: ${project.projectName}`,
+        );
         // Get API key
         const apiKey = await projectStorage.getApiKey(projectId);
         if (!apiKey) {
@@ -188,13 +201,23 @@ async function switchProjectCommand(
         appwriteClient.initialize(project, apiKey);
 
         treeProvider.refresh();
+
+        // Emit event
+        await EventBus.getInstance().emit("project.switched", {
+          projectId,
+          projectName: project.projectName,
+        });
+
+        end(true);
       },
     );
 
-    vscode.window.showInformationMessage(
-      `✓ Switched to "${project.projectName}"`,
+    outputChannel.success(
+      "PROJECTS",
+      `Switched to project: ${project.projectName}`,
     );
   } catch (error) {
+    outputChannel.error("PROJECTS", "Failed to switch project", error);
     vscode.window.showErrorMessage(
       `Failed to switch project: ${error instanceof Error ? error.message : "Unknown error"}`,
     );
