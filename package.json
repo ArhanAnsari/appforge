@@ -2,7 +2,7 @@
   "name": "appforge",
   "displayName": "AppForge",
   "description": "AppForge is an Appwrite-native developer cockpit inside VS Code. Manage projects, databases, functions, and logs without leaving your editor.",
-  "version": "0.1.0-alpha",
+  "version": "0.1.1-alpha",
   "publisher": "appforge",
   "author": "AppForge Team",
   "license": "MIT",
@@ -144,6 +144,12 @@
         "title": "AppForge: Delete Database",
         "category": "AppForge",
         "icon": "$(trash)"
+      },
+      {
+        "command": "appforge.viewDatabase",
+        "title": "AppForge: View Database",
+        "category": "AppForge",
+        "icon": "$(database)"
       }
     ],
     "menus": {
@@ -185,6 +191,11 @@
         {
           "command": "appforge.deleteDatabase",
           "when": "viewItem == database",
+          "group": "1_modification"
+        },
+        {
+          "command": "appforge.viewDatabase",
+          "when": "viewItem == collection",
           "group": "1_modification"
         }
       ]

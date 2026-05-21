@@ -561,14 +561,19 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
             projectId,
             databaseId,
           };
-          children.push(
-            new AppForgeTreeItem(
-              name,
-              vscode.TreeItemCollapsibleState.None,
-              colData,
-              this.extensionUri,
-            ),
+          const item = new AppForgeTreeItem(
+            name,
+            vscode.TreeItemCollapsibleState.None,
+            colData,
+            this.extensionUri,
           );
+          // Make collections clickable to open database viewer
+          item.command = {
+            command: "appforge.viewDatabase",
+            title: "View Collection",
+            arguments: [item],
+          };
+          children.push(item);
         });
 
         logger.success("TREE", "Returning collections items", {

@@ -15,6 +15,7 @@ import { AppForgeTreeDataProvider } from "./providers/treeDataProvider";
 import { registerProjectCommands } from "./commands/projectCommands";
 import { registerDatabaseCommands } from "./commands/databaseCommands";
 import { registerDatabaseManagementCommands } from "./commands/databaseManagement";
+import { registerDatabaseViewerCommands } from "./commands/databaseViewerCommands";
 import { registerFunctionCommands } from "./commands/functionCommands";
 import { registerDiagnosticsCommands } from "./commands/diagnosticsCommands";
 import { logger } from "./utils/logger";
@@ -62,6 +63,12 @@ export function activate(context: vscode.ExtensionContext) {
       treeDataProvider,
     );
     registerDatabaseManagementCommands(
+      context,
+      appwriteClient,
+      projectStorage,
+      treeDataProvider,
+    );
+    registerDatabaseViewerCommands(
       context,
       appwriteClient,
       projectStorage,
