@@ -30,7 +30,16 @@ export function registerDatabaseCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "appforge.createDocument",
-      async (collectionId: string, databaseId: string) => {
+      async (arg: any, arg2?: any) => {
+        // Handle both tree item context and direct parameters
+        let collectionId: string, databaseId: string;
+        if (typeof arg === "string") {
+          collectionId = arg;
+          databaseId = arg2 || "";
+        } else {
+          collectionId = arg?.data?.id || "";
+          databaseId = arg?.data?.databaseId || "";
+        }
         await createDocumentCommand(
           appwriteClient,
           projectStorage,
@@ -46,7 +55,16 @@ export function registerDatabaseCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "appforge.listDocuments",
-      async (collectionId: string, databaseId: string) => {
+      async (arg: any, arg2?: any) => {
+        // Handle both tree item context and direct parameters
+        let collectionId: string, databaseId: string;
+        if (typeof arg === "string") {
+          collectionId = arg;
+          databaseId = arg2 || "";
+        } else {
+          collectionId = arg?.data?.id || "";
+          databaseId = arg?.data?.databaseId || "";
+        }
         await listDocumentsCommand(
           appwriteClient,
           projectStorage,
@@ -61,7 +79,17 @@ export function registerDatabaseCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "appforge.updateDocument",
-      async (documentId: string, collectionId: string, databaseId: string) => {
+      async (arg: any, arg2?: any, arg3?: any) => {
+        let documentId: string, collectionId: string, databaseId: string;
+        if (typeof arg === "string") {
+          documentId = arg;
+          collectionId = arg2 || "";
+          databaseId = arg3 || "";
+        } else {
+          documentId = arg?.data?.id || "";
+          collectionId = arg?.data?.collectionId || "";
+          databaseId = arg?.data?.databaseId || "";
+        }
         await updateDocumentCommand(
           appwriteClient,
           projectStorage,
@@ -78,7 +106,17 @@ export function registerDatabaseCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "appforge.deleteDocument",
-      async (documentId: string, collectionId: string, databaseId: string) => {
+      async (arg: any, arg2?: any, arg3?: any) => {
+        let documentId: string, collectionId: string, databaseId: string;
+        if (typeof arg === "string") {
+          documentId = arg;
+          collectionId = arg2 || "";
+          databaseId = arg3 || "";
+        } else {
+          documentId = arg?.data?.id || "";
+          collectionId = arg?.data?.collectionId || "";
+          databaseId = arg?.data?.databaseId || "";
+        }
         await deleteDocumentCommand(
           appwriteClient,
           projectStorage,

@@ -22,7 +22,15 @@ export function registerFunctionCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "appforge.executeFunction",
-      async (functionId: string, projectId: string) => {
+      async (arg: any, arg2?: any) => {
+        let functionId: string, projectId: string;
+        if (typeof arg === "string") {
+          functionId = arg;
+          projectId = arg2 || "";
+        } else {
+          functionId = arg?.data?.id || "";
+          projectId = arg?.data?.projectId || "";
+        }
         await executeFunctionCommand(appwriteClient, functionId, projectId);
       },
     ),
@@ -40,12 +48,15 @@ export function registerFunctionCommands(
 
   // View Logs
   context.subscriptions.push(
-    vscode.commands.registerCommand(
-      "appforge.viewLogs",
-      async (projectId: string) => {
-        await viewLogsCommand(appwriteClient, projectId);
-      },
-    ),
+    vscode.commands.registerCommand("appforge.viewLogs", async (arg: any) => {
+      let projectId: string;
+      if (typeof arg === "string") {
+        projectId = arg;
+      } else {
+        projectId = arg?.data?.projectId || "";
+      }
+      await viewLogsCommand(appwriteClient, projectId);
+    }),
   );
 }
 

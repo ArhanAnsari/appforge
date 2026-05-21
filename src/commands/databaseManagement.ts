@@ -22,7 +22,9 @@ export function registerDatabaseManagementCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "appforge.createDatabase",
-      async (projectId?: string) => {
+      async (arg: any) => {
+        // Handle both tree item context and direct projectId
+        const projectId = typeof arg === "string" ? arg : arg?.data?.projectId;
         await createDatabaseCommand(
           appwriteClient,
           projectStorage,
@@ -37,8 +39,17 @@ export function registerDatabaseManagementCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "appforge.deleteDatabase",
-      async (databaseId: string) => {
-        await deleteDatabaseCommand(appwriteClient, treeProvider, databaseId);
+      async (arg: any) => {
+        // Handle both tree item context and direct databaseId
+        const databaseId = typeof arg === "string" ? arg : arg?.data?.id;
+        const projectId =
+          typeof arg === "string" ? undefined : arg?.data?.projectId;
+        await deleteDatabaseCommand(
+          appwriteClient,
+          treeProvider,
+          databaseId,
+          projectId,
+        );
       },
     ),
   );
@@ -131,6 +142,7 @@ async function deleteDatabaseCommand(
   appwriteClient: AppwriteClientService,
   treeProvider: AppForgeTreeDataProvider,
   databaseId: string,
+  _projectId?: string,
 ): Promise<void> {
   try {
     if (!appwriteClient.isInitialized()) {

@@ -129,6 +129,11 @@
         "category": "AppForge"
       },
       {
+        "command": "appforge.troubleshootEmptyDatabases",
+        "title": "AppForge: Troubleshoot Empty Databases",
+        "category": "AppForge"
+      },
+      {
         "command": "appforge.createDatabase",
         "title": "AppForge: Create Database",
         "category": "AppForge",

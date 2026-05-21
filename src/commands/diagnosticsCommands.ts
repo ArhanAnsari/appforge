@@ -6,6 +6,7 @@
 import * as vscode from "vscode";
 import { ProjectStorageService } from "../services/projectStorageService";
 import { AppwriteClientService } from "../services/appwriteClientService";
+import { logger } from "../utils/logger";
 
 /**
  * Register diagnostics commands
@@ -32,6 +33,16 @@ export function registerDiagnosticsCommands(
           appwriteClient,
           projectId,
         );
+      },
+    ),
+  );
+
+  // Troubleshoot Empty Databases
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "appforge.troubleshootEmptyDatabases",
+      async () => {
+        await troubleshootEmptyDatabasesCommand(projectStorage, appwriteClient);
       },
     ),
   );
@@ -196,5 +207,103 @@ async function viewConnectionInfoCommand(
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     vscode.window.showErrorMessage(`Error: ${msg}`);
+  }
+}
+
+/**
+ * Troubleshoot why databases are showing as empty
+ */
+async function troubleshootEmptyDatabasesCommand(
+  projectStorage: ProjectStorageService,
+  appwriteClient: AppwriteClientService,
+): Promise<void> {
+  try {
+    const channel = vscode.window.createOutputChannel(
+      "AppForge - Database Troubleshoot",
+    );
+    channel.clear();
+    channel.show(vscode.ViewColumn.Beside);
+
+    channel.appendLine("=== DATABASE TROUBLESHOOTING ===\n");
+
+    const projects = projectStorage.getProjects();
+    if (projects.length === 0) {
+      channel.appendLine("❌ No projects found. Add a project first.");
+      return;
+    }
+
+    for (const project of projects) {
+      channel.appendLine(`\n📌 Testing: ${project.projectName}`);
+      channel.appendLine(`   Project ID: ${project.projectId}`);
+      channel.appendLine(`   Endpoint: ${project.endpoint}`);
+
+      try {
+        const apiKey = await projectStorage.getApiKey(project.projectId);
+        if (!apiKey) {
+          channel.appendLine(`   ❌ No API key found`);
+          continue;
+        }
+
+        channel.appendLine(`   ✅ API key found (${apiKey.length} chars)`);
+
+        // Initialize client for this project
+        appwriteClient.initialize(project, apiKey);
+        const activeProject = appwriteClient.getActiveProject();
+        channel.appendLine(
+          `   ✅ Client initialized for ${activeProject?.projectId}`,
+        );
+
+        // Try to fetch databases
+        const response = await appwriteClient.getDatabases().list();
+        const dbCount =
+          (response as any)?.total ?? (response as any)?.databases?.length ?? 0;
+        channel.appendLine(
+          `   📊 API Response: { total: ${dbCount}, databases: [...] }`,
+        );
+
+        if (dbCount === 0) {
+          channel.appendLine(`   ⚠️  ISSUE: 0 databases found`);
+          channel.appendLine(``);
+          channel.appendLine(`   TROUBLESHOOTING STEPS:`);
+          channel.appendLine(`   1. ✓ API key is working (no auth errors)`);
+          channel.appendLine(`   2. ✓ Project context is correct`);
+          channel.appendLine(
+            `   3. ? Databases may not exist OR key lacks scopes`,
+          );
+          channel.appendLine(``);
+          channel.appendLine(`   NEXT STEPS:`);
+          channel.appendLine(`   a) Verify in Appwrite console:`);
+          channel.appendLine(`      - Login to https://console.appwrite.io`);
+          channel.appendLine(`      - Select project: ${project.projectName}`);
+          channel.appendLine(`      - Go to Databases section`);
+          channel.appendLine(`      - Confirm databases actually exist`);
+          channel.appendLine(``);
+          channel.appendLine(`   b) Check API key permissions:`);
+          channel.appendLine(`      - In console, go to Settings → API Keys`);
+          channel.appendLine(`      - Verify key has "databases.read" scope`);
+          channel.appendLine(
+            `      - Consider using an Admin key with full permissions`,
+          );
+          channel.appendLine(``);
+          channel.appendLine(`   c) Try with a new API key:`);
+          channel.appendLine(
+            `      - Create a new API key with all database scopes`,
+          );
+          channel.appendLine(
+            `      - Run "AppForge: Add Project" to configure it`,
+          );
+        } else {
+          channel.appendLine(`   ✅ Found ${dbCount} database(s)`);
+        }
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        channel.appendLine(`   ❌ Error: ${msg}`);
+      }
+    }
+
+    channel.appendLine("\n=== END TROUBLESHOOTING ===");
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    vscode.window.showErrorMessage(`Troubleshooting error: ${msg}`);
   }
 }

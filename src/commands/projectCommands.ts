@@ -35,7 +35,9 @@ export function registerProjectCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "appforge.removeProject",
-      async (projectId: string) => {
+      async (arg: any) => {
+        // Handle both tree item context and direct projectId
+        const projectId = typeof arg === "string" ? arg : arg?.data?.id;
         await removeProjectCommand(
           projectStorage,
           appwriteClient,
@@ -50,7 +52,9 @@ export function registerProjectCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "appforge.switchProject",
-      async (projectId: string) => {
+      async (arg: any) => {
+        // Handle both tree item context and direct projectId
+        const projectId = typeof arg === "string" ? arg : arg?.data?.id;
         await switchProjectCommand(
           projectStorage,
           appwriteClient,

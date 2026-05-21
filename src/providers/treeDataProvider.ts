@@ -8,6 +8,8 @@ import * as path from "path";
 import { TreeItemData, StoredProject } from "../types";
 import { ProjectStorageService } from "../services/projectStorageService";
 import { AppwriteClientService } from "../services/appwriteClientService";
+import { logger } from "../utils/logger";
+import { extractObjectArrayWithId } from "../utils/responseParser";
 
 /**
  * Tree item for the AppForge sidebar
@@ -272,13 +274,34 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
       let activeProject = this.appwriteClient.getActiveProject();
       if (!activeProject || activeProject.projectId !== projectId) {
         try {
+          logger.debug("TREE", "Auto-switching project", { projectId });
           const apiKey = await this.projectStorage.getApiKey(projectId);
-          if (apiKey) {
-            this.appwriteClient.initialize(project, apiKey);
-            activeProject = this.appwriteClient.getActiveProject();
+          if (!apiKey) {
+            logger.error("TREE", "No API key found for project", { projectId });
+            const errorData: TreeItemData = {
+              type: "databases",
+              label: "Failed to load",
+              projectId,
+            };
+            return [
+              new AppForgeTreeItem(
+                "❌ No API key configured",
+                vscode.TreeItemCollapsibleState.None,
+                errorData,
+                this.extensionUri,
+              ),
+            ];
           }
+          logger.debug("TREE", "API key retrieved, initializing client", {
+            projectId,
+          });
+          this.appwriteClient.initialize(project, apiKey);
+          activeProject = this.appwriteClient.getActiveProject();
+          logger.success("TREE", "Project switched successfully", {
+            projectId,
+          });
         } catch (switchError) {
-          console.error("Error switching project:", switchError);
+          logger.error("TREE", "Error switching project", switchError);
           const errorData: TreeItemData = {
             type: "databases",
             label: "Failed to load",
@@ -295,16 +318,97 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
         }
       }
 
-      // Now fetch databases
+      // Now fetch databases (with robust diagnostics and timeout)
       try {
-        const response = await this.appwriteClient.getDatabases().list();
-        console.log("Databases response:", response);
+        const activeProject = this.appwriteClient.getActiveProject();
+        logger.debug("TREE", "Fetching databases for project", {
+          projectId,
+          endpoint: project.endpoint,
+          activeProjectId: activeProject?.projectId,
+        });
 
-        // Handle different response structures
-        let databases = Array.isArray(response)
-          ? response
-          : response.databases || [];
-        console.log("Parsed databases array:", databases);
+        // Log the exact project context being used
+        logger.info("TREE", "=== PROJECT CONTEXT ===", null);
+        logger.info("TREE", "Target project ID", projectId);
+        logger.info("TREE", "Target endpoint", project.endpoint);
+        logger.info(
+          "TREE",
+          "Active project ID after init",
+          activeProject?.projectId,
+        );
+        logger.info(
+          "TREE",
+          "Context matches",
+          activeProject?.projectId === projectId,
+        );
+        logger.info("TREE", "=== END PROJECT CONTEXT ===", null);
+
+        logger.info("TREE", "Starting API call to list databases...", null);
+
+        // Fetch databases with timeout
+        const response = await Promise.race([
+          this.appwriteClient.getDatabases().list(),
+          new Promise((_, reject) =>
+            setTimeout(
+              () => reject(new Error("Database fetch timeout (30s)")),
+              30000,
+            ),
+          ),
+        ]);
+
+        logger.success("TREE", "API call completed successfully", null);
+
+        // Log full response for debugging - handle circular refs
+        logger.info("TREE", "=== RAW API RESPONSE ===", null);
+        logger.info("TREE", "Response type", typeof response);
+        logger.info(
+          "TREE",
+          "Response instanceof Object",
+          response instanceof Object,
+        );
+        logger.info(
+          "TREE",
+          "Response keys",
+          response && typeof response === "object"
+            ? Object.keys(response)
+            : "N/A",
+        );
+        logger.info("TREE", "Response.total", (response as any)?.total);
+        logger.info(
+          "TREE",
+          "Response.databases length",
+          (response as any)?.databases?.length,
+        );
+
+        // Safely stringify with replacer to avoid circular refs
+        try {
+          const seen = new WeakSet();
+          const jsonStr = JSON.stringify(
+            response,
+            (key, value) => {
+              if (typeof value === "object" && value !== null) {
+                if (seen.has(value)) {
+                  return "[Circular]";
+                }
+                seen.add(value);
+              }
+              return value;
+            },
+            2,
+          );
+          logger.info("TREE", "Response JSON", jsonStr);
+        } catch (stringifyError) {
+          logger.error("TREE", "Failed to stringify response", stringifyError);
+          logger.info("TREE", "Response toString", response?.toString());
+        }
+
+        logger.info("TREE", "=== END RAW RESPONSE ===", null);
+
+        const databases = extractObjectArrayWithId(response);
+        logger.debug("TREE", "Extracted databases array", {
+          length: databases.length,
+          sample: databases.slice(0, 3),
+        });
 
         const children: AppForgeTreeItem[] = [];
 
@@ -314,6 +418,7 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
             label: "No databases",
             projectId,
           };
+          logger.info("TREE", "No databases found for project", { projectId });
           return [
             new AppForgeTreeItem(
               "📭 No databases yet",
@@ -325,15 +430,17 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
         }
 
         databases.forEach((db: any) => {
+          const id = db.$id || db.id || db.databaseId || db.name;
+          const name = db.name || db.$id || db.id;
           const dbData: TreeItemData = {
             type: "database",
-            label: db.name,
-            id: db.$id,
+            label: name,
+            id,
             projectId,
           };
           children.push(
             new AppForgeTreeItem(
-              `📦 ${db.name}`,
+              `📦 ${name}`,
               vscode.TreeItemCollapsibleState.Collapsed,
               dbData,
               this.extensionUri,
@@ -341,10 +448,13 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
           );
         });
 
-        console.log("Returning database items:", children.length);
+        logger.success("TREE", "Returning database items", {
+          projectId,
+          count: children.length,
+        });
         return children;
       } catch (listError) {
-        console.error("Error listing databases:", listError);
+        logger.error("TREE", "Error listing databases", listError);
         const errorData: TreeItemData = {
           type: "databases",
           label: "Error",
@@ -393,10 +503,32 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
       }
 
       try {
-        const response = await this.appwriteClient
-          .getDatabases()
-          .listCollections(databaseId);
-        const collections = response.collections || [];
+        logger.debug("TREE", "Fetching collections for database", {
+          databaseId,
+          projectId,
+        });
+
+        // Fetch collections with timeout
+        const response = await Promise.race([
+          this.appwriteClient.getDatabases().listCollections(databaseId),
+          new Promise((_, reject) =>
+            setTimeout(
+              () => reject(new Error("Collections fetch timeout (30s)")),
+              30000,
+            ),
+          ),
+        ]);
+
+        logger.success("TREE", "Collections API call completed", {
+          databaseId,
+        });
+
+        const collections = extractObjectArrayWithId(response);
+        logger.debug("TREE", "Extracted collections array", {
+          length: collections.length,
+          sample: collections.slice(0, 3),
+        });
+
         const children: AppForgeTreeItem[] = [];
 
         if (collections.length === 0) {
@@ -405,6 +537,10 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
             label: "No collections",
             projectId,
           };
+          logger.info("TREE", "No collections found for database", {
+            databaseId,
+            projectId,
+          });
           return [
             new AppForgeTreeItem(
               "No collections yet",
@@ -416,16 +552,18 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
         }
 
         collections.forEach((col: any) => {
+          const id = col.$id || col.id || col.collectionId || col.name;
+          const name = col.name || col.$id || col.id;
           const colData: TreeItemData = {
             type: "collection",
-            label: col.name,
-            id: col.$id,
+            label: name,
+            id,
             projectId,
             databaseId,
           };
           children.push(
             new AppForgeTreeItem(
-              col.name,
+              name,
               vscode.TreeItemCollapsibleState.None,
               colData,
               this.extensionUri,
@@ -433,9 +571,14 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
           );
         });
 
+        logger.success("TREE", "Returning collections items", {
+          databaseId,
+          projectId,
+          count: children.length,
+        });
         return children;
       } catch (listError) {
-        console.error("Error listing collections:", listError);
+        logger.error("TREE", "Error listing collections", listError);
         const errorData: TreeItemData = {
           type: "collection",
           label: "Error",
