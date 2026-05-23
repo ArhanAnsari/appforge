@@ -201,14 +201,16 @@ export class FunctionLogsPanel {
         throw new Error("API key not found");
       }
 
-      this.appwriteClient.initialize(project, apiKey);
-
       outputChannel.debug("LOGS", "Loading function logs", {
         functionId: this.state.functionId,
       });
 
       // Fetch function executions (recent logs)
-      const functions = this.appwriteClient.getFunctions();
+      const functions = this.appwriteClient.createFunctionsService(
+        project,
+        apiKey,
+      );
+      void functions;
 
       // In a real implementation, we'd fetch execution logs here
       // For now, we'll show a placeholder

@@ -214,9 +214,10 @@ export class DatabaseViewerPanel {
         throw new Error("API key not found");
       }
 
-      this.appwriteClient.initialize(project, apiKey);
-
-      const databases = this.appwriteClient.getDatabases();
+      const databases = this.appwriteClient.createDatabasesService(
+        project,
+        apiKey,
+      );
 
       // Build Appwrite-safe queries. Search is handled locally to avoid
       // malformed server-side queries when a collection lacks search indexes.
@@ -324,15 +325,13 @@ export class DatabaseViewerPanel {
         throw new Error("API key not found");
       }
 
-      this.appwriteClient.initialize(project, apiKey);
-
       logger.debug("DBVIEWER", "Updating document", {
         documentId,
         fieldsCount: Object.keys(data).length,
       });
 
       await this.appwriteClient
-        .getDatabases()
+        .createDatabasesService(project, apiKey)
         .updateDocument(
           this.state.databaseId,
           this.state.collectionId,
@@ -377,12 +376,10 @@ export class DatabaseViewerPanel {
         throw new Error("API key not found");
       }
 
-      this.appwriteClient.initialize(project, apiKey);
-
       logger.debug("DBVIEWER", "Deleting document", { documentId });
 
       await this.appwriteClient
-        .getDatabases()
+        .createDatabasesService(project, apiKey)
         .deleteDocument(
           this.state.databaseId,
           this.state.collectionId,

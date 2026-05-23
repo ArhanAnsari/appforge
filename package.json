@@ -134,6 +134,11 @@
         "category": "AppForge"
       },
       {
+        "command": "appforge.verifyAppwriteProjectEnvironment",
+        "title": "AppForge: Verify Appwrite Project Environment",
+        "category": "AppForge"
+      },
+      {
         "command": "appforge.createDatabase",
         "title": "AppForge: Create Database",
         "category": "AppForge",

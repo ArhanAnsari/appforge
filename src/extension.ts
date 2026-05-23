@@ -89,7 +89,7 @@ export function activate(context: vscode.ExtensionContext) {
     registerDiagnosticsCommands(context, projectStorage, appwriteClient);
 
     // Auto-load active project on activation
-    loadActiveProjectOnActivation(projectStorage, appwriteClient);
+    loadActiveProjectOnActivation(projectStorage);
 
     logger.success("EXTENSION", "✓ AppForge initialized successfully");
     outputChannel.success("EXTENSION", "AppForge initialized successfully");
@@ -110,12 +110,10 @@ export function activate(context: vscode.ExtensionContext) {
  */
 async function loadActiveProjectOnActivation(
   projectStorage: ProjectStorageService,
-  appwriteClient: AppwriteClientService,
 ): Promise<void> {
   try {
     const projectWithKey = await projectStorage.getActiveProjectWithApiKey();
     if (projectWithKey) {
-      appwriteClient.initialize(projectWithKey, projectWithKey.apiKey);
       logger.success(
         "EXTENSION",
         `✓ Loaded active project: ${projectWithKey.projectName}`,
@@ -139,6 +137,5 @@ async function loadActiveProjectOnActivation(
  * Deactivate the extension
  */
 export function deactivate() {
-  AppwriteClientService.getInstance().reset();
   outputChannel.info("EXTENSION", "AppForge extension deactivated");
 }

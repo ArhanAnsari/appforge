@@ -140,9 +140,9 @@ async function removeProjectCommand(
         );
         await projectStorage.removeProject(projectId);
 
-        // If this was the active project, reset client
-        if (appwriteClient.getActiveProject()?.projectId === projectId) {
-          appwriteClient.reset();
+        // If this was the active project, clear the stored selection
+        if (projectStorage.getActiveProjectId() === projectId) {
+          await projectStorage.setActiveProjectId(undefined);
         }
 
         refreshManager.queueRefresh("all");
@@ -195,11 +195,14 @@ async function switchProjectCommand(
           throw new Error("API key not found in secure storage");
         }
 
+        const databases = appwriteClient.createDatabasesService(
+          project,
+          apiKey,
+        );
+        await databases.list();
+
         // Update active project
         await projectStorage.setActiveProjectId(projectId);
-
-        // Initialize client
-        appwriteClient.initialize(project, apiKey);
 
         refreshManager.queueRefresh("all");
 

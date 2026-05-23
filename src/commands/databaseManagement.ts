@@ -29,8 +29,8 @@ export function registerDatabaseManagementCommands(
         // Handle both tree item context and direct projectId
         const projectId = typeof arg === "string" ? arg : arg?.data?.projectId;
         await createDatabaseCommand(
-          appwriteClient,
           projectStorage,
+          appwriteClient,
           treeProvider,
           projectId,
         );
@@ -48,8 +48,9 @@ export function registerDatabaseManagementCommands(
         const projectId =
           typeof arg === "string" ? undefined : arg?.data?.projectId;
         await deleteDatabaseCommand(
-          appwriteClient,
           treeProvider,
+          projectStorage,
+          appwriteClient,
           databaseId,
           projectId,
         );
@@ -62,16 +63,29 @@ export function registerDatabaseManagementCommands(
  * Create a new database
  */
 async function createDatabaseCommand(
-  appwriteClient: AppwriteClientService,
   projectStorage: ProjectStorageService,
+  appwriteClient: AppwriteClientService,
   treeProvider: AppForgeTreeDataProvider,
   projectId?: string,
 ): Promise<void> {
   try {
-    if (!appwriteClient.isInitialized()) {
+    const resolvedProjectId = projectId ?? projectStorage.getActiveProjectId();
+    if (!resolvedProjectId) {
       vscode.window.showErrorMessage(
-        "No active project. Switch to a project first.",
+        "No project selected. Switch to a project first.",
       );
+      return;
+    }
+
+    const project = projectStorage.getProjectById(resolvedProjectId);
+    if (!project) {
+      vscode.window.showErrorMessage("Project not found");
+      return;
+    }
+
+    const apiKey = await projectStorage.getApiKey(resolvedProjectId);
+    if (!apiKey) {
+      vscode.window.showErrorMessage("API key not found in secure storage");
       return;
     }
 
@@ -123,17 +137,17 @@ async function createDatabaseCommand(
             "DATABASE",
             `Create database: ${databaseName}`,
           );
-          const databases = appwriteClient.getDatabases();
+          const databases = appwriteClient.createDatabasesService(
+            project,
+            apiKey,
+          );
           const db = await databases.create(databaseId, databaseName);
 
-          const activeProject = appwriteClient.getActiveProject();
-          if (activeProject) {
-            await EventBus.getInstance().emit("database.created", {
-              projectId: activeProject.projectId,
-              databaseId,
-              name: databaseName,
-            });
-          }
+          await EventBus.getInstance().emit("database.created", {
+            projectId: resolvedProjectId,
+            databaseId,
+            name: databaseName,
+          });
 
           refreshManager.queueRefresh("databases");
           outputChannel.success(
@@ -161,16 +175,30 @@ async function createDatabaseCommand(
  * Delete a database
  */
 async function deleteDatabaseCommand(
-  appwriteClient: AppwriteClientService,
   treeProvider: AppForgeTreeDataProvider,
+  projectStorage: ProjectStorageService,
+  appwriteClient: AppwriteClientService,
   databaseId: string,
   _projectId?: string,
 ): Promise<void> {
   try {
-    if (!appwriteClient.isInitialized()) {
+    const resolvedProjectId = _projectId ?? projectStorage.getActiveProjectId();
+    if (!resolvedProjectId) {
       vscode.window.showErrorMessage(
-        "No active project. Switch to a project first.",
+        "No project selected. Switch to a project first.",
       );
+      return;
+    }
+
+    const project = projectStorage.getProjectById(resolvedProjectId);
+    if (!project) {
+      vscode.window.showErrorMessage("Project not found");
+      return;
+    }
+
+    const apiKey = await projectStorage.getApiKey(resolvedProjectId);
+    if (!apiKey) {
+      vscode.window.showErrorMessage("API key not found in secure storage");
       return;
     }
 
@@ -199,16 +227,16 @@ async function deleteDatabaseCommand(
             "DATABASE",
             `Delete database: ${databaseId}`,
           );
-          const databases = appwriteClient.getDatabases();
+          const databases = appwriteClient.createDatabasesService(
+            project,
+            apiKey,
+          );
           await databases.delete(databaseId);
 
-          const activeProject = appwriteClient.getActiveProject();
-          if (activeProject) {
-            await EventBus.getInstance().emit("database.deleted", {
-              projectId: activeProject.projectId,
-              databaseId,
-            });
-          }
+          await EventBus.getInstance().emit("database.deleted", {
+            projectId: resolvedProjectId,
+            databaseId,
+          });
 
           refreshManager.queueRefresh("databases");
           outputChannel.success("DATABASE", `Database deleted: ${databaseId}`);

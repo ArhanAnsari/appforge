@@ -338,7 +338,7 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
       const projectNodeId = `project:${project.projectId}`;
       // Show active project highlight
       const isActive =
-        this.appwriteClient.getActiveProject()?.projectId === project.projectId;
+        this.projectStorage.getActiveProjectId() === project.projectId;
       const label = isActive
         ? `📁 ${project.projectName} (active)`
         : `📁 ${project.projectName}`;
@@ -465,55 +465,26 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
         ];
       }
 
-      // Recreate the databases client for every requested project to avoid
-      // any stale client reuse across project switches.
-      this.appwriteClient.initialize(project, apiKey);
-
-      // Auto-switch to this project if not already active
-      let activeProject = this.appwriteClient.getActiveProject();
-      if (!activeProject || activeProject.projectId !== projectId) {
-        try {
-          logger.debug("TREE", "Auto-switching project", { projectId });
-          logger.debug("TREE", "API key retrieved, initializing client", {
-            projectId,
-          });
-          // Client already initialized above for the requested project.
-          activeProject = this.appwriteClient.getActiveProject();
-          logger.success("TREE", "Project switched successfully", {
-            projectId,
-          });
-        } catch (switchError) {
-          logger.error("TREE", "Error switching project", switchError);
-          const errorData: TreeItemData = {
-            type: "databases",
-            label: "Failed to load",
-            id: "switch-error",
-            projectId,
-            treeId: `databases:${projectId}:switch-error`,
-          };
-          return [
-            new AppForgeTreeItem(
-              "❌ Failed to load databases",
-              vscode.TreeItemCollapsibleState.None,
-              errorData,
-              this.extensionUri,
-            ),
-          ];
-        }
-      }
+      outputChannel.debug("DATABASES", "Stored project metadata", {
+        storageSource: "ProjectStorageService.getProjectById",
+        activeProjectSource: "ProjectStorageService.getActiveProjectId",
+        requestedProjectId: projectId,
+        storedProject: project,
+        apiKeyPrefix: apiKey.substring(0, 6),
+        apiKeyLength: apiKey.length,
+      });
 
       // Now fetch databases (with robust diagnostics and timeout)
       try {
-        const activeProject = this.appwriteClient.getActiveProject();
         outputChannel.debug("DATABASES", "Fetch starting", {
           requestedProjectId: projectId,
-          activeProjectId: activeProject?.projectId,
+          activeProjectId: this.projectStorage.getActiveProjectId(),
           expectedEndpoint: project.endpoint,
         });
         logger.debug("TREE", "Fetching databases for project", {
           projectId,
           endpoint: project.endpoint,
-          activeProjectId: activeProject?.projectId,
+          activeProjectId: this.projectStorage.getActiveProjectId(),
         });
 
         // Log the exact project context being used
@@ -522,20 +493,52 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
         logger.info("TREE", "Target endpoint", project.endpoint);
         logger.info(
           "TREE",
-          "Active project ID after init",
-          activeProject?.projectId,
+          "Active project ID from storage",
+          this.projectStorage.getActiveProjectId(),
         );
         logger.info(
           "TREE",
           "Context matches",
-          activeProject?.projectId === projectId,
+          this.projectStorage.getActiveProjectId() === projectId,
         );
         logger.info("TREE", "=== END PROJECT CONTEXT ===", null);
 
         logger.info("TREE", "Starting API call to list databases...", null);
 
+        try {
+          const rawRes = await fetch(`${project.endpoint}/databases`, {
+            headers: {
+              "X-Appwrite-Project": projectId,
+              "X-Appwrite-Key": apiKey,
+              "Content-Type": "application/json",
+            },
+          });
+
+          let rawBody: unknown;
+          try {
+            rawBody = await rawRes.json();
+          } catch {
+            rawBody = await rawRes.text();
+          }
+
+          outputChannel.debug("DATABASES", "RAW REST RESPONSE", {
+            projectId,
+            status: rawRes.status,
+            body: rawBody,
+          });
+        } catch (rawFetchError) {
+          outputChannel.error(
+            "DATABASES",
+            "RAW REST fetch failed",
+            rawFetchError as Error,
+          );
+        }
+
         // Fetch databases with timeout
-        const databasesClient = this.appwriteClient.getDatabases();
+        const databasesClient = this.appwriteClient.createDatabasesService(
+          project,
+          apiKey,
+        );
         outputChannel.debug("DATABASES", "Client config", {
           endpoint: project.endpoint,
           project: project.projectId,
@@ -715,20 +718,14 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
         return [];
       }
 
-      // Auto-switch to this project if needed
-      let activeProject = this.appwriteClient.getActiveProject();
-      if (!activeProject || activeProject.projectId !== projectId) {
-        const project = this.projectStorage.getProjectById(projectId);
-        if (project) {
-          try {
-            const apiKey = await this.projectStorage.getApiKey(projectId);
-            if (apiKey) {
-              this.appwriteClient.initialize(project, apiKey);
-            }
-          } catch (e) {
-            outputChannel.error("TREE", "Error switching project", e as Error);
-          }
-        }
+      const project = this.projectStorage.getProjectById(projectId);
+      if (!project) {
+        return [];
+      }
+
+      const apiKey = await this.projectStorage.getApiKey(projectId);
+      if (!apiKey) {
+        return [];
       }
 
       try {
@@ -738,8 +735,12 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
         });
 
         // Fetch collections with timeout
+        const databasesClient = this.appwriteClient.createDatabasesService(
+          project,
+          apiKey,
+        );
         const response = await Promise.race([
-          this.appwriteClient.getDatabases().listCollections(databaseId),
+          databasesClient.listCollections(databaseId),
           new Promise((_, reject) =>
             setTimeout(
               () => reject(new Error("Collections fetch timeout (30s)")),
@@ -856,41 +857,17 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
         return [];
       }
 
-      // Auto-switch to this project if not already active
-      let activeProject = this.appwriteClient.getActiveProject();
-      if (!activeProject || activeProject.projectId !== projectId) {
-        try {
-          const apiKey = await this.projectStorage.getApiKey(projectId);
-          if (apiKey) {
-            this.appwriteClient.initialize(project, apiKey);
-            activeProject = this.appwriteClient.getActiveProject();
-          }
-        } catch (switchError) {
-          outputChannel.error(
-            "TREE",
-            "Error switching project",
-            switchError as Error,
-          );
-          const errorData: TreeItemData = {
-            type: "functions",
-            label: "Failed to load",
-            id: "switch-error",
-            projectId,
-            treeId: `functions:${projectId}:switch-error`,
-          };
-          return [
-            new AppForgeTreeItem(
-              "❌ Failed to load functions",
-              vscode.TreeItemCollapsibleState.None,
-              errorData,
-              this.extensionUri,
-            ),
-          ];
-        }
-      }
-
       try {
-        const response = await this.appwriteClient.getFunctions().list();
+        const apiKey = await this.projectStorage.getApiKey(projectId);
+        if (!apiKey) {
+          return [];
+        }
+
+        const functionsClient = this.appwriteClient.createFunctionsService(
+          project,
+          apiKey,
+        );
+        const response = await functionsClient.list();
         const functions = response.functions || [];
         const children: AppForgeTreeItem[] = [];
 

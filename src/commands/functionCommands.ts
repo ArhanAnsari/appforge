@@ -89,12 +89,15 @@ async function executeFunctionCommand(
   projectId: string,
 ): Promise<void> {
   try {
-    if (!appwriteClient.isInitialized()) {
-      vscode.window.showErrorMessage(
-        "No active project. Switch to a project first.",
-      );
+    const projectContext = await resolveProjectContext(
+      projectStorage,
+      projectId,
+    );
+    if (!projectContext) {
       return;
     }
+
+    const { project, apiKey, projectId: resolvedProjectId } = projectContext;
 
     // Get execution data from user (optional JSON)
     const dataInput = await vscode.window.showInputBox({
@@ -134,7 +137,10 @@ async function executeFunctionCommand(
       async () => {
         try {
           const start = Date.now();
-          const functions = appwriteClient.getFunctions();
+          const functions = appwriteClient.createFunctionsService(
+            project,
+            apiKey,
+          );
           const execution = await functions.createExecution(functionId, data);
 
           outputChannel.success(
@@ -146,8 +152,7 @@ async function executeFunctionCommand(
 
           // Emit function executed event
           await EventBus.getInstance().emit("function.executed", {
-            projectId:
-              projectId || appwriteClient.getActiveProject()?.projectId || "",
+            projectId: resolvedProjectId,
             functionId,
             status: execution.status,
             timestamp: Date.now(),
@@ -159,7 +164,7 @@ async function executeFunctionCommand(
               context.extensionUri,
               appwriteClient,
               projectStorage,
-              projectId || appwriteClient.getActiveProject()?.projectId || "",
+              resolvedProjectId,
               functionId,
               functionId,
             );
@@ -190,8 +195,7 @@ async function executeFunctionCommand(
           const message =
             error instanceof Error ? error.message : String(error);
           await EventBus.getInstance().emit("error.occurred", {
-            projectId:
-              projectId || appwriteClient.getActiveProject()?.projectId,
+            projectId: resolvedProjectId,
             operation: "function.execute",
             message,
             error,
@@ -226,12 +230,12 @@ async function deployFunctionCommand(
   context: vscode.ExtensionContext,
 ): Promise<void> {
   try {
-    if (!appwriteClient.isInitialized()) {
-      vscode.window.showErrorMessage(
-        "No active project. Switch to a project first.",
-      );
+    const projectContext = await resolveProjectContext(projectStorage);
+    if (!projectContext) {
       return;
     }
+
+    const { project, apiKey, projectId: resolvedProjectId } = projectContext;
 
     // Step 1: Get function details
     const functionId = await vscode.window.showInputBox({
@@ -344,7 +348,10 @@ async function deployFunctionCommand(
       },
       async () => {
         try {
-          const functions = appwriteClient.getFunctions();
+          const functions = appwriteClient.createFunctionsService(
+            project,
+            apiKey,
+          );
 
           // Create the function
           let functionObj;
@@ -362,7 +369,7 @@ async function deployFunctionCommand(
               Date.now() - start,
             );
             await EventBus.getInstance().emit("function.deployed", {
-              projectId: appwriteClient.getActiveProject()?.projectId || "",
+              projectId: resolvedProjectId,
               functionId,
               name: functionName,
               timestamp: Date.now(),
@@ -403,7 +410,7 @@ async function deployFunctionCommand(
 
           // Emit logs.updated to trigger logs panel if listening
           await EventBus.getInstance().emit("logs.updated", {
-            projectId: appwriteClient.getActiveProject()?.projectId || "",
+            projectId: resolvedProjectId,
             functionId,
             logs: [],
             timestamp: Date.now(),
@@ -415,7 +422,7 @@ async function deployFunctionCommand(
               context.extensionUri,
               appwriteClient,
               projectStorage,
-              appwriteClient.getActiveProject()?.projectId || "",
+              resolvedProjectId,
               functionId,
               functionName,
             );
@@ -453,13 +460,6 @@ async function viewLogsCommand(
   projectId: string,
 ): Promise<void> {
   try {
-    if (!appwriteClient.isInitialized()) {
-      vscode.window.showErrorMessage(
-        "No active project. Switch to a project first.",
-      );
-      return;
-    }
-
     // For alpha, show placeholder
     const message = `Logs View
     
@@ -478,4 +478,35 @@ For now, view logs in your Appwrite console.`;
     const message = error instanceof Error ? error.message : String(error);
     vscode.window.showErrorMessage(`Error: ${message}`);
   }
+}
+
+async function resolveProjectContext(
+  projectStorage: ProjectStorageService,
+  explicitProjectId?: string,
+): Promise<{
+  project: NonNullable<ReturnType<ProjectStorageService["getProjectById"]>>;
+  apiKey: string;
+  projectId: string;
+} | null> {
+  const projectId = explicitProjectId ?? projectStorage.getActiveProjectId();
+  if (!projectId) {
+    vscode.window.showErrorMessage(
+      "No project selected. Switch to a project first.",
+    );
+    return null;
+  }
+
+  const project = projectStorage.getProjectById(projectId);
+  if (!project) {
+    vscode.window.showErrorMessage("Project not found");
+    return null;
+  }
+
+  const apiKey = await projectStorage.getApiKey(projectId);
+  if (!apiKey) {
+    vscode.window.showErrorMessage("API key not found in secure storage");
+    return null;
+  }
+
+  return { project, apiKey, projectId };
 }
