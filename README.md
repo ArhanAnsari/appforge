@@ -1,411 +1,289 @@
 # AppForge
 
-**Appwrite-native developer cockpit inside VS Code**
+Appwrite-native developer tooling inside VS Code.
 
-[![Version](https://img.shields.io/badge/version-0.1.0--alpha-blue)](./CHANGELOG.md)
-[![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
-[![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue)](./tsconfig.json)
+[![Version](https://img.shields.io/badge/version-0.1.1--alpha-0ea5e9)](./CHANGELOG.md)
+[![Alpha](https://img.shields.io/badge/status-alpha-f59e0b)](./CHANGELOG.md)
+[![VS Code](https://img.shields.io/badge/VS%20Code-extension-007acc)](https://code.visualstudio.com/api)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)](./tsconfig.json)
+[![Appwrite](https://img.shields.io/badge/Appwrite-integrated-f02e65)](https://appwrite.io)
+[![License](https://img.shields.io/badge/license-MIT-22c55e)](#license)
 
-Remove the need to constantly switch to the Appwrite console. Manage your projects, databases, functions, and logs directly from VS Code.
+AppForge is a VS Code extension for Appwrite developers who need multi-project backend workflows without leaving the editor. It combines project management, a TreeView resource explorer, diagnostics, structured logging, and secure credential storage into a single developer cockpit.
 
 ## Overview
 
-AppForge is a production-grade VS Code extension that brings Appwrite project management into your editor. Built with TypeScript, Appwrite SDK, and Zod validation, it provides a polished alpha experience with:
+AppForge removes the friction of bouncing between VS Code and the Appwrite console for everyday backend tasks. It is designed for developers who manage multiple Appwrite projects, need fast context switching, and want reliable visibility into what the extension is doing when data looks wrong.
 
-- 📦 Project management with secure credential storage
-- 🌳 Intuitive sidebar tree view
-- 🔄 Instant project switching
-- 🚀 Foundation for database, function, and log management
-- ✓ Strict TypeScript with zero `any` types
-- 📝 Comprehensive error handling and validation
+It solves the problems that usually show up in real Appwrite workflows:
 
-## Features (v0.1.0-alpha)
+- Switching between tools just to inspect projects, databases, or functions
+- Losing confidence in backend state when async refreshes race each other
+- Debugging empty or inconsistent results without enough logging
+- Managing multiple projects with unsafe shared client state
+- Repeating setup work every time you return to the console
 
-### Project Management
+## Core Features
 
-- ✅ **Persistent Setup Panel**: Professional webview form that stays open when you switch to your browser
-- ✅ **Add Project**: Guided setup with validation, auto-save, and connection testing
-- ✅ **Remove Project**: With confirmation dialog
-- ✅ **Switch Project**: Instant context switching
-- ✅ **Secure Storage**: API keys encrypted via VS Code SecretStorage
+### Multi-Project Management
 
-**NEW**: The setup panel auto-saves your input locally, so switching to your Appwrite console won't lose your progress. Never fill out the same form twice!
+- Store multiple Appwrite projects securely in VS Code workspace state and SecretStorage
+- Add, remove, and switch projects from the sidebar or command palette
+- Keep project metadata isolated by project ID
+- Auto-load the active project on extension activation
 
-### Sidebar Tree View
+### TreeView Resource Explorer
 
-- ✅ **Projects Section**: View all configured projects
-- ✅ **Databases Section**: Expandable database list
-- ✅ **Collections View**: Nested collection display
-- ✅ **Functions Section**: Show functions with status indicators
-- ✅ **Logs Access**: Quick navigation to function logs
-- ✅ **Context Menus**: Right-click actions on projects
+- Browse projects, databases, collections, functions, and logs from the Activity Bar
+- Expand resources lazily for responsive navigation
+- Preserve expansion state across refreshes
+- Use context menus for quick project actions
 
-### Database Operations (NEW in v0.1.0)
+### Appwrite Integration
 
-- ✅ **List Databases**: View all databases in project
-- ✅ **List Collections**: Expandable collections view
-- ✅ **Create Document**: JSON input with validation
-- ✅ **Delete Document**: With confirmation dialog
-- ✅ **Auto-refresh**: Tree updates after mutations
+- Connect to Appwrite Cloud or self-hosted Appwrite instances
+- Use Appwrite API keys for backend operations
+- Validate connections before saving a project
+- Run database and function workflows from within VS Code
 
-### Function Operations (NEW in v0.1.0)
+### Project Switching
 
-- ✅ **Execute Function**: Run functions with optional input data
-- ✅ **Deploy Function**: Select folder and initiate deployment
-- ✅ **View Logs**: Placeholder for Phase 2 full log viewer
+- Switch context instantly from the sidebar
+- Avoid manual reconfiguration when moving between environments
+- Keep each project node independent and deterministic
+- Reduce stale state during fast project changes
 
-### Code Snippets (NEW in v0.1.0)
+### Diagnostics System
 
-- ✅ **25 Appwrite Snippets**: Production-ready code templates
-  - Project initialization (awclient, awinit)
-  - Database operations (awdb, awc, awattr, awindex, awdoc, etc.)
-  - Authentication (awaccount, awsignup, awlogin, awlogout, awsession)
-  - Functions (awfn, awexec, awdeploy)
-  - Storage (awstorage, awupload, awdeletefile)
-  - Teams (awteam)
-  - Queries (awqueryeq, awquerylimit, awqueryorder)
-  - Utilities (awid)
+- Inspect stored project metadata and connection details
+- Compare SDK responses with raw REST responses
+- Troubleshoot empty database results with dedicated tooling
+- Verify project and endpoint identity before chasing UI bugs
 
-### Developer Experience
+### Logging System
 
-- ✅ Loading indicators for async operations
-- ✅ Success, error, and warning notifications
-- ✅ Input validation with inline feedback
-- ✅ Command palette integration
-- ✅ Intuitive UI with proper icons
+- Structured runtime logging through the Output Channel
+- Success, warning, error, and debug events
+- Timing-aware logging for async operations
+- Diagnostics output designed for real support workflows
 
-## Installation
+### Developer-Focused UX
 
-### From VS Code Marketplace (Coming Soon)
+- Validation-rich setup forms
+- Loading indicators for long-running operations
+- Confirmation dialogs for destructive actions
+- Command palette integration for all major workflows
+- Clear status feedback for project and backend actions
 
-1. Open VS Code Extensions (`Ctrl+Shift+X`)
-2. Search for "AppForge"
-3. Click Install
+### Type-Safe Architecture
 
-### From Source (Development)
+- Written in strict TypeScript
+- Uses Zod for configuration and input validation
+- Built on VS Code extension APIs with explicit service boundaries
+- Keeps project state, backend state, and UI state separated
 
-```bash
-# Clone the repository
-git clone https://github.com/appforge/appforge-vscode.git
-cd appforge
+### Command Palette Integration
 
-# Install dependencies
-npm install
+- `AppForge: Add Project`
+- `AppForge: Remove Project`
+- `AppForge: Switch Project`
+- `AppForge: Refresh Projects`
+- `AppForge: Refresh Databases`
+- `AppForge: Create Document`
+- `AppForge: Delete Document`
+- `AppForge: List Documents`
+- `AppForge: Update Document`
+- `AppForge: Execute Function`
+- `AppForge: Deploy Function`
+- `AppForge: View Logs`
+- `AppForge: Check Project Status`
+- `AppForge: View Connection Info`
+- `AppForge: Troubleshoot Empty Databases`
+- `AppForge: Verify Appwrite Project Environment`
 
-# Build and run in development mode
-npm run watch
+## ✨ What's New in v0.1.1-alpha
 
-# Package for publication
-npm run package
-```
+v0.1.1-alpha is a reliability and architecture hardening release.
 
-## Quick Start
+- Stable TreeItem identity system for consistent TreeView reconciliation
+- Fixed mixed-resource rendering and expansion behavior
+- Deterministic refresh behavior with less UI drift
+- Project-scoped Appwrite client architecture
+- Cross-project isolation by design
+- No shared mutable client state across async operations
+- Better handling during rapid project switching
+- Database fetch diagnostics with stored metadata logging
+- Raw REST + SDK verification tooling
+- More transparent endpoint, project ID, and API key context
+- Reduced stale-state risk in database and function flows
+- Stronger debugging infrastructure for multi-project support
 
-### Add Your First Project
-
-1. Open the **AppForge** panel in the sidebar (Activity Bar)
-2. Click **+ Add Project** or use Command Palette: `Cmd+Shift+P` → "AppForge: Add Project"
-3. **Professional setup panel opens** (stays open when you switch to browser!)
-4. Fill in your Appwrite project details:
-   - **Project Name**: Display name for your project
-   - **Endpoint**: Your Appwrite instance URL (e.g., `https://cloud.appwrite.io/v1`)
-   - **Project ID**: Your Appwrite project ID
-   - **API Key**: Your Appwrite API key (securely stored)
-5. Click **"Test Connection"** to verify everything works
-6. Click **"Save Project"** to add it
-7. Your project appears in the sidebar instantly
-
-**💡 Tip**: The setup panel auto-saves your input. Click "Open Appwrite Console" to retrieve credentials without losing your progress!
-
-### Switch Between Projects
-
-Click any project name in the sidebar to switch context instantly.
-
-### Remove a Project
-
-Right-click a project → **Remove Project** (this removes stored credentials locally, not your Appwrite project).
-
-### Using Code Snippets
-
-AppForge includes 25 production-ready Appwrite SDK snippets for JavaScript/TypeScript:
-
-1. Open a `.ts` or `.js` file
-2. Start typing a snippet prefix:
-   - `awclient` → Create Appwrite client
-   - `awdb` → Database operations
-   - `awdoc` → Create document
-   - `awlogin` → Email password login
-   - `awfn` → Functions instance
-   - See [FOLDER_STRUCTURE.md](./FOLDER_STRUCTURE.md) for complete list
-
-3. Select snippet from IntelliSense
-4. Fill in placeholder values
-
-Example:
-
-```
-awclient + Tab →
-const client = new Client()
-  .setEndpoint("${1:endpoint}")
-  .setProject("${2:projectId}");
-```
-
-All snippets follow Appwrite SDK best practices and include proper error handling patterns.
+This release intentionally moves away from unsafe shared mutable client state and toward explicit project-scoped service creation for every Appwrite operation.
 
 ## Architecture
 
-### Core Services
+AppForge is organized around explicit boundaries so project context never depends on hidden global state.
 
-#### AppwriteClientService
+### Project-Scoped Services
 
-Singleton pattern for Appwrite client lifecycle:
+Each Appwrite operation is created from project-specific inputs rather than a long-lived mutable client. That keeps database, function, and diagnostic calls tied to the project being acted on.
 
-- Initialize with project configuration
-- Switch between projects
-- Expose Databases, Functions, Account, Storage, Teams clients
+### Appwrite Client Lifecycle
 
-#### ProjectStorageService
+The client layer now acts as a factory for isolated SDK instances. Services are created per project and per operation, then discarded after use. That removes cross-project contamination and async race conditions caused by shared state.
 
-Secure project storage and credential management:
+### Extension Structure
 
-- Store projects in workspace state
-- Store API keys in VS Code SecretStorage (encrypted)
-- Auto-load active project on activation
+- `src/extension.ts` wires activation, services, and command registration
+- `src/providers/treeDataProvider.ts` owns the sidebar resource explorer
+- `src/commands/` contains project, database, function, and diagnostics workflows
+- `src/views/` contains webviews and resource panels
+- `src/services/` contains storage and Appwrite client factories
+- `src/core/` contains refresh orchestration, events, and output logging
+- `src/types/` contains shared type definitions
+- `src/utils/` contains validation and parsing helpers
 
-### Data Providers
+### Diagnostics Flow
 
-#### AppForgeTreeDataProvider
+Diagnostics are designed to answer a simple question quickly: is the problem local, configuration-related, or remote?
 
-VS Code tree view integration:
+The current flow captures:
 
-- Dynamic tree structure based on project state
-- Lazy-load data on expansion
-- Refresh capability at any level
+- Stored project metadata from workspace state
+- Redacted API key context
+- Endpoint and project ID identity
+- SDK response payloads
+- Raw REST response payloads
 
-### Type System
+### Command System
 
-- **AppwriteProject**: Full project configuration
-- **StoredProject**: Persisted project metadata
-- **TreeItemData**: Tree view item representation
-- **CommandResult**: Standard async operation result
+Commands are exposed through the command palette and sidebar interactions. Each command resolves project context explicitly before creating its Appwrite service, which keeps behavior deterministic even when multiple projects are open or switching quickly.
 
-### Validation
+## Screenshots
 
-All user inputs validated with Zod schemas:
+> Replace these placeholders with real captures before publishing.
 
-- Project configuration (name, endpoint, projectId)
-- API key format
-- Database names
+### Project Explorer
 
-## Commands
+![Project Explorer placeholder](./docs/images/project-explorer.png)
 
-### Project Management
+### Database Tree
 
-- `AppForge: Add Project` - Add new Appwrite project
-- `AppForge: Remove Project` - Remove project
-- `AppForge: Switch Project` - Switch active project
-- `AppForge: Refresh Projects` - Refresh project list
+![Database Tree placeholder](./docs/images/database-tree.png)
 
-### Database Operations (Phase 2)
+### Diagnostics Logs
 
-- `AppForge: Refresh Databases` - Reload database list
-- `AppForge: Create Document` - Coming in v0.2.0
-- `AppForge: Delete Document` - Coming in v0.2.0
+![Diagnostics Logs placeholder](./docs/images/diagnostics-logs.png)
 
-### Function Operations (Phase 2)
+### Project Switching
 
-- `AppForge: Execute Function` - Coming in v0.2.0
-- `AppForge: Deploy Function` - Coming in v0.2.0
-- `AppForge: View Logs` - Coming in v0.2.0
+![Project Switching placeholder](./docs/images/project-switching.png)
 
-## Requirements
+## Installation
 
-- **VS Code**: >= 1.120.0
-- **Node.js**: >= 18.0.0 (for development)
-- **Appwrite**: >= 1.4.0 instance
+### From Source
 
-## Extension Settings
+```bash
+git clone https://github.com/ArhanAnsari/appforge.git
+cd appforge
+npm install
+npm run build
+```
 
-Future versions will support:
+### Run the Extension Host
 
-- Custom timeout configurations
-- Project-specific API settings
-- Theme preferences
-- Automatic refresh intervals
+```bash
+npm run watch
+```
 
-## Known Limitations
-
-- Document CRUD UI coming in Phase 2
-- Function deployment coming in Phase 2
-- Real-time log streaming coming in Phase 2
-
-## Known Limitations (v0.1.0-alpha)
-
-- Document preview panel coming in Phase 2
-- Advanced log viewer coming in Phase 2
-- Real-time log streaming coming in Phase 2
-- Limited filter/search (coming in Phase 2)
-- Batch operations (coming in Phase 3+)
-
-## Roadmap
-
-### ✅ Completed in v0.1.0
-
-- Project management (add, remove, switch)
-- Secure credential storage (SecretStorage + WorkspaceState)
-- Tree view with projects, databases, functions, logs
-- Database CRUD (create/delete documents)
-- Function execution with input parameters
-- Code snippet engine (25 production-ready snippets)
-- Comprehensive documentation
-
-### Phase 2 (v0.2.0)
-
-- Document preview panel
-- Advanced real-time function log viewer
-- Function deployment workflow completion
-- Settings panel
-- Connection diagnostics
-- Batch operations on documents
-
-### Phase 3 (v0.3.0)
-
-- Storage bucket management
-- Team and permission management
-- Workspace integration features
-- Advanced search and filtering
-
-### Future
-
-- Collaboration features
-- Extension marketplace integration
-- Multi-user workspaces
-- Custom extensions
-
-## Architecture Documentation
-
-For detailed architecture information, see [v0.1.0-alpha.md](./docs/v0.1.0-alpha.md)
-
-Topics covered:
-
-- Service layer design
-- Data provider implementation
-- Security and credential storage
-- Type system and validation
-- Error handling strategies
-
-## Troubleshooting
-
-### Extension won't activate
-
-- Ensure VS Code version >= 1.120.0
-- Check `Help → About` for your version
-- Restart VS Code
-
-### Projects not appearing in sidebar
-
-- Check workspace state is readable
-- Verify you added projects previously
-- Reload VS Code window (`Cmd+R`)
-
-### Credentials not saved
-
-- Verify OS credential manager is available
-- Check VS Code has permission to access credentials
-- Try re-adding the project
-
-### Connection errors when expanding sections
-
-- Verify your Appwrite instance is accessible
-- Check your API key is valid
-- Review browser console for details
+Then press `F5` in VS Code to launch the Extension Development Host.
 
 ## Development
 
-### Setup
+### Common Commands
 
 ```bash
-npm install
-npm run watch              # Development watch mode
-npm run check-types        # Type checking
-npm run lint              # ESLint
-npm run test              # Run tests
-npm run package           # Build for production
+npm run check-types
+npm run lint
+npm run build
+npm run watch
 ```
 
 ### Project Structure
 
-```
+For a deeper layout reference, see [FOLDER_STRUCTURE.md](./FOLDER_STRUCTURE.md).
+
+```text
 src/
-├── commands/              # Command handlers (project, database, function)
-├── providers/             # Tree data provider for sidebar
-├── services/              # Business logic (Appwrite client, storage)
-├── types/                 # Type definitions
-├── utils/                 # Validators (Zod schemas)
-├── views/                 # Webviews (ready for Phase 2)
-├── test/                  # Tests (ready for Phase 2)
-└── extension.ts           # Main entry point
-
-snippets/
-└── appwrite.code-snippets # 25 production-ready code snippets
+├── commands/   # Project, database, function, and diagnostics commands
+├── core/       # Event bus, refresh manager, and output channel
+├── providers/  # TreeView data provider
+├── services/   # Appwrite and storage services
+├── types/      # Shared TypeScript definitions
+├── utils/      # Validation and parsing helpers
+└── views/      # Webview panels
 ```
 
-For detailed folder structure explanation, see [FOLDER_STRUCTURE.md](./FOLDER_STRUCTURE.md)
+### Quality Gates
 
-### Code Quality
+- Strict TypeScript compilation
+- ESLint validation
+- Explicit service boundaries
+- Structured runtime diagnostics
+- Secure credential storage
 
-- ✓ Strict TypeScript (no `any`)
-- ✓ Modular architecture
-- ✓ Comprehensive error handling
-- ✓ Full type safety
-- ✓ Clear public interfaces
-- ✓ Inline documentation
+## Roadmap
+
+AppForge is intentionally scoped, but the roadmap is aimed at making it a complete Appwrite operations surface inside VS Code.
+
+- Functions explorer with execution history
+- Storage bucket explorer and file management
+- Auth management tooling
+- Deployment workflows for functions and resources
+- Realtime monitoring for logs and backend events
+- AI-assisted developer tooling and smart diagnostics
+- Appwrite Cloud region and environment diagnostics
+- Direct resource editing for supported Appwrite entities
 
 ## Contributing
 
-We welcome contributions! Please:
+Contributions are welcome.
 
-1. Fork the repository
-2. Create a feature branch
-3. Follow TypeScript strict mode rules
-4. Add comments for complex logic
-5. Test thoroughly
-6. Submit a pull request
+Please keep changes focused, typed, and consistent with the existing architecture:
+
+1. Fork the repository and create a feature branch.
+2. Preserve strict TypeScript compatibility.
+3. Prefer explicit project-scoped logic over shared mutable state.
+4. Add or update diagnostics when fixing backend integration issues.
+5. Run typecheck and lint before opening a pull request.
+6. Keep the README and docs aligned with user-facing changes.
+
+If you are proposing a larger workflow or architecture change, include the reasoning and validation path in the pull request description.
+
+## Documentation
+
+- Alpha architecture notes: [docs/v0.1.1-alpha.md](./docs/v0.1.1-alpha.md)
+- Release history: [CHANGELOG.md](./CHANGELOG.md)
+- Folder layout reference: [FOLDER_STRUCTURE.md](./FOLDER_STRUCTURE.md)
+
+## Troubleshooting
+
+- Extension does not activate: confirm VS Code `^1.120.0` or newer and reload the window.
+- Projects do not appear: verify the workspace contains saved AppForge project state.
+- Connection test fails: check the endpoint, project ID, and API key.
+- Databases appear empty: run `AppForge: Verify Appwrite Project Environment` and compare the raw REST output with the Appwrite console.
+- Project switching looks inconsistent: confirm the project ID in the sidebar matches the project ID stored in AppForge.
+
+## Requirements
+
+- VS Code `^1.120.0`
+- Node.js 18+ for development
+- An Appwrite instance or Appwrite Cloud project
 
 ## License
 
-MIT License - See [LICENSE](LICENSE) file
-
-## Support
-
-- 📖 [Documentation](./docs/v0.1.0-alpha.md)
-- 🐛 [Report Issues](https://github.com/appforge/appforge-vscode/issues)
-- 💬 [Discussions](https://github.com/appforge/appforge-vscode/discussions)
-- 📧 [Contact](mailto:team@appforge.dev)
+MIT License.
 
 ---
 
-**AppForge** - Built for developers by developers. Bringing Appwrite to your editor.
-
-Made with ❤️ for the Appwrite community.
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-- [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-- Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-- Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-- Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-- [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-- [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+AppForge is built for Appwrite developers who want stronger tooling, clearer diagnostics, and less context switching.

@@ -2,6 +2,27 @@
 
 All notable changes to the AppForge extension will be documented in this file.
 
+## [0.1.1-alpha] - 2026-05-23
+
+### Added
+
+- Project-scoped Appwrite client factories for multi-project safety
+- Raw REST and SDK diagnostics for database troubleshooting
+- Verify Appwrite Project Environment command
+- Stable TreeItem identity handling for cleaner TreeView refreshes
+
+### Changed
+
+- Replaced shared mutable client state with explicit per-project service creation
+- Updated database, function, and diagnostics workflows to resolve project context directly
+- Refreshed README and architecture docs for the v0.1.1-alpha release
+
+### Fixed
+
+- Cross-project client contamination during async operations
+- Empty or inconsistent database results caused by shared client state
+- TreeView refresh drift during rapid project switching
+
 ## [0.1.0-alpha] - 2026-05-20
 
 ### Added
