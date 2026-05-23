@@ -9,6 +9,8 @@ import { TreeItemData, StoredProject } from "../types";
 import { ProjectStorageService } from "../services/projectStorageService";
 import { AppwriteClientService } from "../services/appwriteClientService";
 import { logger } from "../utils/logger";
+import { outputChannel } from "../core/output/outputChannel";
+import { refreshManager } from "../core/refresh/refreshManager";
 import { extractObjectArrayWithId } from "../utils/responseParser";
 
 /**
@@ -23,8 +25,37 @@ export class AppForgeTreeItem extends vscode.TreeItem {
   ) {
     super(label, collapsibleState);
 
+    this.id = data.treeId ?? AppForgeTreeItem.buildStableId(data);
+    outputChannel.debug("TREE-ID", "TreeItem created", {
+      type: data.type,
+      id: this.id,
+    });
+
     // Set icons based on type
     this.setIconAndCommand();
+  }
+
+  private static buildStableId(data: TreeItemData): string {
+    switch (data.type) {
+      case "project":
+        return `project:${data.id ?? data.label}`;
+      case "databases":
+        return `databases:${data.projectId ?? data.label}`;
+      case "database":
+        return `database:${data.projectId ?? ""}:${data.id ?? data.label}`;
+      case "collection":
+        return `collection:${data.projectId ?? ""}:${data.databaseId ?? ""}:${data.id ?? data.label}`;
+      case "functions":
+        return data.id
+          ? `function:${data.projectId ?? ""}:${data.id}`
+          : `functions:${data.projectId ?? data.label}`;
+      case "logs":
+        return `logs:${data.projectId ?? data.label}`;
+      case "root":
+        return `root:${data.label}`;
+      default:
+        return `${data.type}:${data.projectId ?? ""}:${data.id ?? data.label}`;
+    }
   }
 
   private setIconAndCommand(): void {
@@ -91,11 +122,82 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
     private extensionUri: vscode.Uri,
   ) {}
 
+  private view?: vscode.TreeView<AppForgeTreeItem>;
+  private expandedIds: Set<string> = new Set();
+  private loadingNodes: Map<string, boolean> = new Map();
+
+  /**
+   * Attach the TreeView instance so we can listen to expand/collapse and
+   * subscribe to refresh manager events for live updates.
+   */
+  public attachView(view: vscode.TreeView<AppForgeTreeItem>): void {
+    this.view = view;
+
+    // Track expansion state
+    view.onDidExpandElement((e) => {
+      const id = e.element?.id;
+      if (id) {
+        this.expandedIds.add(id);
+      }
+    });
+    view.onDidCollapseElement((e) => {
+      const id = e.element?.id;
+      if (id) {
+        this.expandedIds.delete(id);
+      }
+    });
+
+    // Subscribe to refresh manager events
+    refreshManager.onRefresh((request) => {
+      // For now, trigger a refresh and mark a simple loading state
+      try {
+        // mark a generic loading indicator for the scope
+        const key = `scope:${request.scope}:${request.nodeId || ""}`;
+        this.loadingNodes.set(key, true);
+        this._onDidChangeTreeData.fire(null);
+
+        // clear loading after a short delay (RefreshManager will trigger real updates)
+        setTimeout(() => {
+          this.loadingNodes.delete(key);
+          this._onDidChangeTreeData.fire(null);
+        }, 800);
+      } catch (e) {
+        outputChannel.error(
+          "TREE",
+          "Error handling refreshManager event",
+          e as Error,
+        );
+      }
+    });
+
+    refreshManager.onLoadingChange((nodeId, isLoading) => {
+      // When loading state changes, re-render affected nodes
+      try {
+        if (isLoading) {
+          this.loadingNodes.set(nodeId, true);
+        } else {
+          this.loadingNodes.delete(nodeId);
+        }
+        this._onDidChangeTreeData.fire(null);
+      } catch (e) {
+        outputChannel.error(
+          "TREE",
+          "Error handling loading change",
+          e as Error,
+        );
+      }
+    });
+  }
+
   /**
    * Refresh the tree view
    */
   public refresh(): void {
     this._onDidChangeTreeData.fire(null);
+  }
+
+  private isExpanded(nodeId: string): boolean {
+    return this.expandedIds.has(nodeId);
   }
 
   /**
@@ -112,34 +214,76 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
     element?: AppForgeTreeItem,
   ): Promise<AppForgeTreeItem[]> {
     try {
+      outputChannel.debug("TREE", "getChildren called", {
+        elementType: element?.data.type ?? "root",
+        elementId: element?.id,
+        dataId: element?.data.id,
+        projectId: element?.data.projectId,
+      });
+
       // Root level - show Projects, Databases, Functions, Logs
       if (!element) {
-        return this.getRootChildren();
+        const rootChildren = this.getRootChildren();
+        outputChannel.debug("TREE", "Returning root children", {
+          count: rootChildren.length,
+          childIds: rootChildren.map((child) => child.id),
+        });
+        return rootChildren;
       }
 
       // Project level
       if (element.data.type === "project") {
-        return this.getProjectChildren(element);
+        const projectChildren = this.getProjectChildren(element);
+        outputChannel.debug("TREE", "Returning project children", {
+          projectId: element.data.id,
+          count: projectChildren.length,
+          childIds: projectChildren.map((child) => child.id),
+        });
+        return projectChildren;
       }
 
       // Databases section
       if (element.data.type === "databases") {
-        return this.getDatabasesChildren(element);
+        const databaseChildren = await this.getDatabasesChildren(element);
+        outputChannel.debug("TREE", "Returning database children", {
+          projectId: element.data.projectId,
+          count: databaseChildren.length,
+          childIds: databaseChildren.map((child) => child.id),
+        });
+        return databaseChildren;
       }
 
       // Database children (collections)
       if (element.data.type === "database") {
-        return this.getDatabaseCollectionsChildren(element);
+        const collectionChildren =
+          await this.getDatabaseCollectionsChildren(element);
+        outputChannel.debug("TREE", "Returning collection children", {
+          projectId: element.data.projectId,
+          databaseId: element.data.id,
+          count: collectionChildren.length,
+          childIds: collectionChildren.map((child) => child.id),
+        });
+        return collectionChildren;
       }
 
       // Functions section
       if (element.data.type === "functions") {
-        return this.getFunctionsChildren(element);
+        const functionChildren = await this.getFunctionsChildren(element);
+        outputChannel.debug("TREE", "Returning function children", {
+          projectId: element.data.projectId,
+          count: functionChildren.length,
+          childIds: functionChildren.map((child) => child.id),
+        });
+        return functionChildren;
       }
 
       return [];
     } catch (error) {
-      console.error("Error getting tree children:", error);
+      outputChannel.error(
+        "TREE",
+        "Error getting tree children",
+        error as Error,
+      );
       return [];
     }
   }
@@ -152,6 +296,7 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
     const addProjectData: TreeItemData = {
       type: "root",
       label: "Add Project",
+      treeId: "root:Add Project",
     };
     const addItem = new AppForgeTreeItem(
       "➕ Add New Project",
@@ -170,6 +315,7 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
       const separatorData: TreeItemData = {
         type: "root",
         label: "Projects",
+        treeId: "root:Projects",
       };
       children.push(
         new AppForgeTreeItem(
@@ -187,15 +333,27 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
         type: "project",
         label: project.projectName,
         id: project.projectId,
+        treeId: `project:${project.projectId}`,
       };
-      children.push(
-        new AppForgeTreeItem(
-          `📁 ${project.projectName}`,
-          vscode.TreeItemCollapsibleState.Collapsed,
-          projectData,
-          this.extensionUri,
-        ),
+      const projectNodeId = `project:${project.projectId}`;
+      // Show active project highlight
+      const isActive =
+        this.appwriteClient.getActiveProject()?.projectId === project.projectId;
+      const label = isActive
+        ? `📁 ${project.projectName} (active)`
+        : `📁 ${project.projectName}`;
+      const item = new AppForgeTreeItem(
+        label,
+        this.isExpanded(projectNodeId)
+          ? vscode.TreeItemCollapsibleState.Expanded
+          : vscode.TreeItemCollapsibleState.Collapsed,
+        projectData,
+        this.extensionUri,
       );
+      if (isActive) {
+        item.description = "Active";
+      }
+      children.push(item);
     });
 
     return children;
@@ -203,17 +361,22 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
 
   private getProjectChildren(element: AppForgeTreeItem): AppForgeTreeItem[] {
     const children: AppForgeTreeItem[] = [];
+    const projectId = element.data.id;
 
     // Databases section
     const databasesData: TreeItemData = {
       type: "databases",
       label: "Databases",
-      projectId: element.data.id,
+      projectId,
+      treeId: `databases:${projectId}`,
     };
+    const databasesNodeId = `databases:${projectId}`;
     children.push(
       new AppForgeTreeItem(
         "📦 Databases",
-        vscode.TreeItemCollapsibleState.Collapsed,
+        this.isExpanded(databasesNodeId)
+          ? vscode.TreeItemCollapsibleState.Expanded
+          : vscode.TreeItemCollapsibleState.Collapsed,
         databasesData,
         this.extensionUri,
       ),
@@ -223,12 +386,16 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
     const functionsData: TreeItemData = {
       type: "functions",
       label: "Functions",
-      projectId: element.data.id,
+      projectId,
+      treeId: `functions:${projectId}`,
     };
+    const functionsNodeId = `functions:${projectId}`;
     children.push(
       new AppForgeTreeItem(
         "⚙️ Functions",
-        vscode.TreeItemCollapsibleState.Collapsed,
+        this.isExpanded(functionsNodeId)
+          ? vscode.TreeItemCollapsibleState.Expanded
+          : vscode.TreeItemCollapsibleState.Collapsed,
         functionsData,
         this.extensionUri,
       ),
@@ -238,7 +405,8 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
     const logsData: TreeItemData = {
       type: "logs",
       label: "Logs",
-      projectId: element.data.id,
+      projectId,
+      treeId: `logs:${projectId}`,
     };
     const logsItem = new AppForgeTreeItem(
       "📋 Logs",
@@ -252,6 +420,12 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
       arguments: [element.data.id],
     };
     children.push(logsItem);
+
+    outputChannel.debug("TREE", "Built project children", {
+      projectId,
+      count: children.length,
+      childIds: children.map((child) => child.id),
+    });
 
     return children;
   }
@@ -270,32 +444,40 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
         return [];
       }
 
+      const apiKey = await this.projectStorage.getApiKey(projectId);
+      if (!apiKey) {
+        outputChannel.error("DATABASES", "Missing API key for project", {
+          projectId,
+        });
+        return [
+          new AppForgeTreeItem(
+            "❌ No API key configured",
+            vscode.TreeItemCollapsibleState.None,
+            {
+              type: "databases",
+              label: "Failed to load",
+              id: "api-key-missing",
+              projectId,
+              treeId: `databases:${projectId}:api-key-missing`,
+            },
+            this.extensionUri,
+          ),
+        ];
+      }
+
+      // Recreate the databases client for every requested project to avoid
+      // any stale client reuse across project switches.
+      this.appwriteClient.initialize(project, apiKey);
+
       // Auto-switch to this project if not already active
       let activeProject = this.appwriteClient.getActiveProject();
       if (!activeProject || activeProject.projectId !== projectId) {
         try {
           logger.debug("TREE", "Auto-switching project", { projectId });
-          const apiKey = await this.projectStorage.getApiKey(projectId);
-          if (!apiKey) {
-            logger.error("TREE", "No API key found for project", { projectId });
-            const errorData: TreeItemData = {
-              type: "databases",
-              label: "Failed to load",
-              projectId,
-            };
-            return [
-              new AppForgeTreeItem(
-                "❌ No API key configured",
-                vscode.TreeItemCollapsibleState.None,
-                errorData,
-                this.extensionUri,
-              ),
-            ];
-          }
           logger.debug("TREE", "API key retrieved, initializing client", {
             projectId,
           });
-          this.appwriteClient.initialize(project, apiKey);
+          // Client already initialized above for the requested project.
           activeProject = this.appwriteClient.getActiveProject();
           logger.success("TREE", "Project switched successfully", {
             projectId,
@@ -305,7 +487,9 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
           const errorData: TreeItemData = {
             type: "databases",
             label: "Failed to load",
+            id: "switch-error",
             projectId,
+            treeId: `databases:${projectId}:switch-error`,
           };
           return [
             new AppForgeTreeItem(
@@ -321,6 +505,11 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
       // Now fetch databases (with robust diagnostics and timeout)
       try {
         const activeProject = this.appwriteClient.getActiveProject();
+        outputChannel.debug("DATABASES", "Fetch starting", {
+          requestedProjectId: projectId,
+          activeProjectId: activeProject?.projectId,
+          expectedEndpoint: project.endpoint,
+        });
         logger.debug("TREE", "Fetching databases for project", {
           projectId,
           endpoint: project.endpoint,
@@ -346,15 +535,27 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
         logger.info("TREE", "Starting API call to list databases...", null);
 
         // Fetch databases with timeout
-        const response = await Promise.race([
-          this.appwriteClient.getDatabases().list(),
-          new Promise((_, reject) =>
-            setTimeout(
-              () => reject(new Error("Database fetch timeout (30s)")),
-              30000,
+        const databasesClient = this.appwriteClient.getDatabases();
+        outputChannel.debug("DATABASES", "Client config", {
+          endpoint: project.endpoint,
+          project: project.projectId,
+        });
+
+        let response: any;
+        try {
+          response = await Promise.race([
+            databasesClient.list(),
+            new Promise((_, reject) =>
+              setTimeout(
+                () => reject(new Error("Database fetch timeout (30s)")),
+                30000,
+              ),
             ),
-          ),
-        ]);
+          ]);
+        } catch (fetchError) {
+          outputChannel.error("DATABASES", "Fetch failed", fetchError as Error);
+          throw fetchError;
+        }
 
         logger.success("TREE", "API call completed successfully", null);
 
@@ -404,6 +605,15 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
 
         logger.info("TREE", "=== END RAW RESPONSE ===", null);
 
+        outputChannel.debug("DATABASES", "Raw response", {
+          projectId,
+          total: response?.total,
+          databases: response?.databases?.map((db: any) => ({
+            id: db.$id,
+            name: db.name,
+          })),
+        });
+
         const databases = extractObjectArrayWithId(response);
         logger.debug("TREE", "Extracted databases array", {
           length: databases.length,
@@ -416,7 +626,9 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
           const emptyData: TreeItemData = {
             type: "databases",
             label: "No databases",
+            id: "empty",
             projectId,
+            treeId: `database:${projectId}:empty`,
           };
           logger.info("TREE", "No databases found for project", { projectId });
           return [
@@ -437,15 +649,26 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
             label: name,
             id,
             projectId,
+            treeId: `database:${projectId}:${id}`,
           };
+          const nodeKey = `db:${projectId}:${id}`;
+          const loading = this.loadingNodes.get(nodeKey) || false;
+          const labelText = loading ? `📦 ${name} ⏳` : `📦 ${name}`;
           children.push(
             new AppForgeTreeItem(
-              `📦 ${name}`,
-              vscode.TreeItemCollapsibleState.Collapsed,
+              labelText,
+              this.isExpanded(nodeKey)
+                ? vscode.TreeItemCollapsibleState.Expanded
+                : vscode.TreeItemCollapsibleState.Collapsed,
               dbData,
               this.extensionUri,
             ),
           );
+        });
+
+        outputChannel.debug("DATABASES", "Final mapped nodes", {
+          projectId,
+          ids: children.map((item) => item.id),
         });
 
         logger.success("TREE", "Returning database items", {
@@ -458,7 +681,9 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
         const errorData: TreeItemData = {
           type: "databases",
           label: "Error",
+          id: "load-error",
           projectId,
+          treeId: `databases:${projectId}:load-error`,
         };
         return [
           new AppForgeTreeItem(
@@ -470,7 +695,11 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
         ];
       }
     } catch (error) {
-      console.error("Error in getDatabasesChildren:", error);
+      outputChannel.error(
+        "TREE",
+        "Error in getDatabasesChildren",
+        error as Error,
+      );
       return [];
     }
   }
@@ -497,7 +726,7 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
               this.appwriteClient.initialize(project, apiKey);
             }
           } catch (e) {
-            console.error("Error switching project:", e);
+            outputChannel.error("TREE", "Error switching project", e as Error);
           }
         }
       }
@@ -535,6 +764,7 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
           const emptyData: TreeItemData = {
             type: "collection",
             label: "No collections",
+            id: "empty",
             projectId,
           };
           logger.info("TREE", "No collections found for database", {
@@ -561,8 +791,10 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
             projectId,
             databaseId,
           };
+          const nodeKey = `col:${projectId}:${databaseId}:${id}`;
+          const loading = this.loadingNodes.get(nodeKey) || false;
           const item = new AppForgeTreeItem(
-            name,
+            loading ? `${name} ⏳` : name,
             vscode.TreeItemCollapsibleState.None,
             colData,
             this.extensionUri,
@@ -587,7 +819,9 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
         const errorData: TreeItemData = {
           type: "collection",
           label: "Error",
+          id: "load-error",
           projectId,
+          treeId: `collection:${projectId}:${databaseId}:load-error`,
         };
         return [
           new AppForgeTreeItem(
@@ -599,7 +833,11 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
         ];
       }
     } catch (error) {
-      console.error("Error in getDatabaseCollectionsChildren:", error);
+      outputChannel.error(
+        "TREE",
+        "Error in getDatabaseCollectionsChildren",
+        error as Error,
+      );
       return [];
     }
   }
@@ -628,11 +866,17 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
             activeProject = this.appwriteClient.getActiveProject();
           }
         } catch (switchError) {
-          console.error("Error switching project:", switchError);
+          outputChannel.error(
+            "TREE",
+            "Error switching project",
+            switchError as Error,
+          );
           const errorData: TreeItemData = {
             type: "functions",
             label: "Failed to load",
+            id: "switch-error",
             projectId,
+            treeId: `functions:${projectId}:switch-error`,
           };
           return [
             new AppForgeTreeItem(
@@ -654,7 +898,9 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
           const emptyData: TreeItemData = {
             type: "functions",
             label: "No functions",
+            id: "empty",
             projectId,
+            treeId: `functions:${projectId}:empty`,
           };
           return [
             new AppForgeTreeItem(
@@ -672,9 +918,13 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
             label: fn.name,
             id: fn.$id,
             projectId,
+            treeId: `function:${projectId}:${fn.$id}`,
           };
+          const nodeKey = `fn:${projectId}:${fn.$id}`;
+          const loading = this.loadingNodes.get(nodeKey) || false;
+          const statusIcon = fn.status === "enabled" ? "✓" : "✗";
           const item = new AppForgeTreeItem(
-            `${fn.name} ${fn.status === "enabled" ? "✓" : "✗"}`,
+            `${fn.name} ${statusIcon} ${loading ? "⏳" : ""}`.trim(),
             vscode.TreeItemCollapsibleState.None,
             fnData,
             this.extensionUri,
@@ -690,11 +940,17 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
 
         return children;
       } catch (listError) {
-        console.error("Error listing functions:", listError);
+        outputChannel.error(
+          "TREE",
+          "Error listing functions",
+          listError as Error,
+        );
         const errorData: TreeItemData = {
           type: "functions",
           label: "Error",
+          id: "load-error",
           projectId,
+          treeId: `functions:${projectId}:load-error`,
         };
         return [
           new AppForgeTreeItem(
@@ -706,7 +962,11 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
         ];
       }
     } catch (error) {
-      console.error("Error in getFunctionsChildren:", error);
+      outputChannel.error(
+        "TREE",
+        "Error in getFunctionsChildren",
+        error as Error,
+      );
       return [];
     }
   }

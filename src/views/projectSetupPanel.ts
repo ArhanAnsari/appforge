@@ -8,6 +8,7 @@ import * as vscode from "vscode";
 import { ProjectStorageService } from "../services/projectStorageService";
 import { AppwriteClientService } from "../services/appwriteClientService";
 import { AppForgeTreeDataProvider } from "../providers/treeDataProvider";
+import { refreshManager } from "../core/refresh/refreshManager";
 import { ProjectConfigSchema, ApiKeySchema } from "../utils/validators";
 import { ZodError } from "zod";
 
@@ -183,8 +184,8 @@ export class ProjectSetupPanel {
         }
       }
 
-      // Refresh tree
-      this.treeProvider.refresh();
+      // Refresh tree through the refresh manager so expansion state is preserved
+      refreshManager.queueRefresh("all");
 
       // Show success and close
       this._panel.webview.postMessage({

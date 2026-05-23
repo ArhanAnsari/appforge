@@ -9,6 +9,7 @@ import { AppForgeTreeDataProvider } from "../providers/treeDataProvider";
 import { ProjectStorageService } from "../services/projectStorageService";
 import { EventBus } from "../core/events/eventBus";
 import { outputChannel } from "../core/output/outputChannel";
+import { refreshManager } from "../core/refresh/refreshManager";
 import { ID } from "node-appwrite";
 
 /**
@@ -114,8 +115,11 @@ async function createDatabaseCommand(
         cancellable: false,
       },
       async () => {
+        let endOperation:
+          | ((success?: boolean, error?: Error) => void)
+          | undefined = undefined;
         try {
-          const end = outputChannel.startOperation(
+          endOperation = outputChannel.startOperation(
             "DATABASE",
             `Create database: ${databaseName}`,
           );
@@ -131,18 +135,18 @@ async function createDatabaseCommand(
             });
           }
 
-          treeProvider.refresh();
+          refreshManager.queueRefresh("databases");
           outputChannel.success(
             "DATABASE",
             `Database created: ${databaseName}`,
           );
-          end(true);
+          endOperation(true);
         } catch (error) {
           outputChannel.error("DATABASE", "Failed to create database", error);
           vscode.window.showErrorMessage(
             `Failed to create database: ${error instanceof Error ? error.message : String(error)}`,
           );
-          end(false, error as Error);
+          endOperation?.(false, error as Error);
         }
       },
     );
@@ -187,8 +191,11 @@ async function deleteDatabaseCommand(
         cancellable: false,
       },
       async () => {
+        let endOperation:
+          | ((success?: boolean, error?: Error) => void)
+          | undefined = undefined;
         try {
-          const end = outputChannel.startOperation(
+          endOperation = outputChannel.startOperation(
             "DATABASE",
             `Delete database: ${databaseId}`,
           );
@@ -203,15 +210,15 @@ async function deleteDatabaseCommand(
             });
           }
 
-          treeProvider.refresh();
+          refreshManager.queueRefresh("databases");
           outputChannel.success("DATABASE", `Database deleted: ${databaseId}`);
-          end(true);
+          endOperation(true);
         } catch (error) {
           outputChannel.error("DATABASE", "Failed to delete database", error);
           vscode.window.showErrorMessage(
             `Failed to delete database: ${error instanceof Error ? error.message : String(error)}`,
           );
-          end(false, error as Error);
+          endOperation?.(false, error as Error);
         }
       },
     );
@@ -221,7 +228,3 @@ async function deleteDatabaseCommand(
     vscode.window.showErrorMessage(`Error: ${message}`);
   }
 }
-function end(arg0: boolean, arg1: Error) {
-  throw new Error("Function not implemented.");
-}
-

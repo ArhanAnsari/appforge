@@ -15,6 +15,7 @@
  */
 
 import * as vscode from "vscode";
+import { Query } from "node-appwrite";
 import { AppwriteClientService } from "../services/appwriteClientService";
 import { ProjectStorageService } from "../services/projectStorageService";
 import { AppForgeTreeDataProvider } from "../providers/treeDataProvider";
@@ -217,24 +218,21 @@ export class DatabaseViewerPanel {
 
       const databases = this.appwriteClient.getDatabases();
 
-      // Build query
+      // Build Appwrite-safe queries. Search is handled locally to avoid
+      // malformed server-side queries when a collection lacks search indexes.
       const queries: string[] = [];
 
-      // Add search query if provided
-      if (this.state.searchQuery) {
-        queries.push(`search("${this.state.searchQuery}")`);
-      }
-
-      // Add sorting
       if (this.state.sortBy) {
-        const order = this.state.sortAsc ? "ASC" : "DESC";
-        queries.push(`orderBy("${this.state.sortBy}", "${order}")`);
+        queries.push(
+          this.state.sortAsc
+            ? Query.orderAsc(this.state.sortBy)
+            : Query.orderDesc(this.state.sortBy),
+        );
       }
 
-      // Add pagination
       const offset = (this.state.currentPage - 1) * this.state.pageSize;
-      queries.push(`limit(${this.state.pageSize})`);
-      queries.push(`offset(${offset})`);
+      queries.push(Query.limit(this.state.pageSize));
+      queries.push(Query.offset(offset));
 
       logger.debug("DBVIEWER", "Fetching documents", {
         collection: this.state.collectionId,
@@ -243,16 +241,55 @@ export class DatabaseViewerPanel {
         queryCount: queries.length,
       });
 
-      // Fetch documents
-      const response: any = await databases.listDocuments(
-        this.state.databaseId,
-        this.state.collectionId,
-        queries,
-      );
+      // Fetch documents and fall back to a plain list if Appwrite rejects
+      // the query set (for example, a missing sort attribute).
+      let response: any;
+      try {
+        response = await databases.listDocuments(
+          this.state.databaseId,
+          this.state.collectionId,
+          queries,
+        );
+      } catch (queryError) {
+        logger.warn("DBVIEWER", "Query rejected, falling back to plain list", {
+          collection: this.state.collectionId,
+          searchEnabled: Boolean(this.state.searchQuery),
+          sortBy: this.state.sortBy,
+          error:
+            queryError instanceof Error
+              ? queryError.message
+              : String(queryError),
+        });
+
+        vscode.window.showWarningMessage(
+          "Some collection filters were rejected by Appwrite. Showing an unfiltered result instead.",
+        );
+
+        response = await databases.listDocuments(
+          this.state.databaseId,
+          this.state.collectionId,
+          [Query.limit(this.state.pageSize), Query.offset(offset)],
+        );
+      }
+
+      let documents = response.documents || [];
+
+      if (this.state.searchQuery.trim()) {
+        const term = this.state.searchQuery.trim().toLowerCase();
+        documents = documents.filter((document: any) => {
+          try {
+            return JSON.stringify(document).toLowerCase().includes(term);
+          } catch {
+            return false;
+          }
+        });
+      }
 
       this.setState({
-        documents: response.documents || [],
-        totalCount: response.total || 0,
+        documents,
+        totalCount: this.state.searchQuery.trim()
+          ? documents.length
+          : response.total || 0,
         isLoading: false,
       });
 

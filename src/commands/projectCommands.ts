@@ -11,6 +11,7 @@ import { SetupGuidePanel } from "../views/setupGuidePanel";
 import { ProjectSetupPanel } from "../views/projectSetupPanel";
 import { EventBus } from "../core/events/eventBus";
 import { outputChannel } from "../core/output/outputChannel";
+import { refreshManager } from "../core/refresh/refreshManager";
 
 /**
  * Register project management commands
@@ -70,7 +71,7 @@ export function registerProjectCommands(
   // Refresh Projects
   context.subscriptions.push(
     vscode.commands.registerCommand("appforge.refreshProjects", async () => {
-      treeProvider.refresh();
+      refreshManager.queueRefresh("all");
       outputChannel.success("PROJECTS", "Projects refreshed");
     }),
   );
@@ -144,7 +145,7 @@ async function removeProjectCommand(
           appwriteClient.reset();
         }
 
-        treeProvider.refresh();
+        refreshManager.queueRefresh("all");
         end(true);
       },
     );
@@ -200,7 +201,7 @@ async function switchProjectCommand(
         // Initialize client
         appwriteClient.initialize(project, apiKey);
 
-        treeProvider.refresh();
+        refreshManager.queueRefresh("all");
 
         // Emit event
         await EventBus.getInstance().emit("project.switched", {

@@ -1,7 +1,7 @@
 /**
  * Refresh Manager
  * Intelligent realtime refresh system
- * 
+ *
  * Features:
  * - Automatic refresh after operations
  * - Preserves tree expansion state
@@ -12,6 +12,7 @@
  */
 
 import { EventBus, EventType, EventPayload } from "../events/eventBus";
+import { outputChannel } from "../output/outputChannel";
 
 interface RefreshRequest {
   scope: "all" | "tree" | "databases" | "functions" | "logs" | "specific";
@@ -36,7 +37,9 @@ export class RefreshManager {
   private isProcessing = false;
   private cachedNodes: Map<string, CachedNode> = new Map();
   private refreshListeners: Array<(request: RefreshRequest) => void> = [];
-  private loadingListeners: Array<(nodeId: string, isLoading: boolean) => void> = [];
+  private loadingListeners: Array<
+    (nodeId: string, isLoading: boolean) => void
+  > = [];
   private debounceTimers: Map<string, NodeJS.Timeout> = new Map();
   private readonly DEBOUNCE_DELAY = 300;
   private readonly MAX_QUEUE_SIZE = 50;
@@ -95,9 +98,21 @@ export class RefreshManager {
    * Queue a refresh request
    */
   public queueRefresh(
-    scope: "all" | "tree" | "databases" | "functions" | "logs" | "specific" = "tree",
+    scope:
+      | "all"
+      | "tree"
+      | "databases"
+      | "functions"
+      | "logs"
+      | "specific" = "tree",
     nodeId?: string,
   ): void {
+    outputChannel.debug("REFRESH", "queueRefresh called", {
+      scope,
+      nodeId,
+      queueSize: this.refreshQueue.length,
+    });
+
     // Don't overflow the queue
     if (this.refreshQueue.length >= this.MAX_QUEUE_SIZE) {
       this.refreshQueue.shift();
@@ -117,6 +132,8 @@ export class RefreshManager {
         timestamp: Date.now(),
       };
 
+      outputChannel.debug("REFRESH", "enqueueing refresh request", request);
+
       this.refreshQueue.push(request);
       this.debounceTimers.delete(key);
       this.processQueue();
@@ -134,10 +151,15 @@ export class RefreshManager {
     }
 
     this.isProcessing = true;
+    outputChannel.debug("REFRESH", "processQueue started", {
+      queueSize: this.refreshQueue.length,
+    });
 
     try {
       while (this.refreshQueue.length > 0) {
         const request = this.refreshQueue.shift()!;
+
+        outputChannel.debug("REFRESH", "processing refresh request", request);
 
         // Mark nodes as stale
         this.markNodesStale(request.scope, request.nodeId);
@@ -150,6 +172,9 @@ export class RefreshManager {
       }
     } finally {
       this.isProcessing = false;
+      outputChannel.debug("REFRESH", "processQueue finished", {
+        remainingQueueSize: this.refreshQueue.length,
+      });
     }
   }
 
@@ -208,7 +233,9 @@ export class RefreshManager {
   /**
    * Register loading state listener
    */
-  public onLoadingChange(callback: (nodeId: string, isLoading: boolean) => void): () => void {
+  public onLoadingChange(
+    callback: (nodeId: string, isLoading: boolean) => void,
+  ): () => void {
     this.loadingListeners.push(callback);
     return () => {
       const index = this.loadingListeners.indexOf(callback);
@@ -226,7 +253,11 @@ export class RefreshManager {
       try {
         listener(request);
       } catch (error) {
-        console.error("RefreshManager listener error:", error);
+        outputChannel.error(
+          "REFRESH",
+          "RefreshManager listener error",
+          error as Error,
+        );
       }
     });
   }
@@ -252,7 +283,11 @@ export class RefreshManager {
       try {
         listener(nodeId, isLoading);
       } catch (error) {
-        console.error("RefreshManager loading listener error:", error);
+        outputChannel.error(
+          "REFRESH",
+          "RefreshManager loading listener error",
+          error as Error,
+        );
       }
     });
   }

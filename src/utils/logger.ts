@@ -81,21 +81,7 @@ export class AppForgeLogger {
       }
     }
 
-    // Also log to console for DevTools
-    const consoleLog = `${logLine}${data ? "\n" + JSON.stringify(data) : ""}`;
-    switch (level) {
-      case "ERROR":
-        console.error(consoleLog);
-        break;
-      case "WARN":
-        console.warn(consoleLog);
-        break;
-      case "DEBUG":
-        console.debug(consoleLog);
-        break;
-      default:
-        console.log(consoleLog);
-    }
+    // OutputChannel is the single sink for runtime logs.
   }
 
   private getPrefix(level: LogLevel): string {

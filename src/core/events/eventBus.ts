@@ -21,60 +21,122 @@ export type EventType =
   | "function.deployed"
   | "function.executed"
   | "logs.updated"
+  | "refresh.completed"
   | "project.switched"
+  | "project.deleted"
+  | "connection.changed"
+  | "error.occurred"
   | "refresh.requested"
   | "operation.started"
   | "operation.completed";
 
 export interface EventPayload {
-  "database.created": { projectId: string; databaseId: string; name: string };
-  "database.deleted": { projectId: string; databaseId: string };
+  "database.created": {
+    projectId: string;
+    databaseId: string;
+    name: string;
+    timestamp?: number;
+  };
+  "database.deleted": {
+    projectId: string;
+    databaseId: string;
+    timestamp?: number;
+  };
   "collection.created": {
     projectId: string;
     databaseId: string;
     collectionId: string;
     name: string;
+    timestamp?: number;
   };
   "collection.deleted": {
     projectId: string;
     databaseId: string;
     collectionId: string;
+    timestamp?: number;
   };
   "document.created": {
     projectId: string;
     databaseId: string;
     collectionId: string;
     documentId: string;
+    timestamp?: number;
   };
   "document.updated": {
     projectId: string;
     databaseId: string;
     collectionId: string;
     documentId: string;
+    timestamp?: number;
   };
   "document.deleted": {
     projectId: string;
     databaseId: string;
     collectionId: string;
     documentId: string;
+    timestamp?: number;
   };
-  "function.deployed": { projectId: string; functionId: string; name: string };
+  "function.deployed": {
+    projectId: string;
+    functionId: string;
+    name: string;
+    timestamp?: number;
+  };
   "function.executed": {
     projectId: string;
     functionId: string;
     status: string;
+    timestamp?: number;
   };
-  "logs.updated": { projectId: string; functionId: string; logs: string[] };
-  "project.switched": { projectId: string; projectName: string };
+  "logs.updated": {
+    projectId: string;
+    functionId: string;
+    logs: string[];
+    timestamp?: number;
+  };
+  "refresh.completed": {
+    projectId?: string;
+    scope: string;
+    nodeId?: string;
+    duration?: number;
+  };
+  "project.switched": {
+    projectId: string;
+    projectName: string;
+    timestamp?: number;
+  };
+  "project.deleted": {
+    projectId: string;
+    projectName?: string;
+    timestamp?: number;
+  };
+  "connection.changed": {
+    projectId?: string;
+    status: "online" | "offline" | "reconnecting";
+    details?: string;
+    timestamp?: number;
+  };
+  "error.occurred": {
+    projectId?: string;
+    operation: string;
+    message: string;
+    error?: any;
+    timestamp?: number;
+  };
   "refresh.requested": {
     scope: "all" | "tree" | "databases" | "functions" | "logs";
   };
-  "operation.started": { operationType: string; operationId: string };
+  "operation.started": {
+    operationType: string;
+    operationId: string;
+    timestamp?: number;
+  };
   "operation.completed": {
     operationType: string;
     operationId: string;
     success: boolean;
     duration: number;
+    timestamp?: number;
   };
 }
 
@@ -210,7 +272,17 @@ export class EventBus {
       }
     } catch (error) {
       // Error isolation: one listener error doesn't crash others
-      console.error("EventBus listener error:", error);
+      try {
+        // Defer import to avoid circular deps
+        const { outputChannel } = await import("../output/outputChannel.js");
+        outputChannel.error(
+          "EVENTS",
+          "EventBus listener error",
+          error as Error,
+        );
+      } catch {
+        // Final fallback intentionally ignored to avoid recursion or console noise.
+      }
     }
   }
 
@@ -231,7 +303,16 @@ export class EventBus {
       try {
         await entry.listener(payload);
       } catch (error) {
-        console.error("EventBus debounced listener error:", error);
+        try {
+          const { outputChannel } = await import("../output/outputChannel.js");
+          outputChannel.error(
+            "EVENTS",
+            "EventBus debounced listener error",
+            error as Error,
+          );
+        } catch {
+          // Final fallback intentionally ignored to avoid recursion or console noise.
+        }
       }
 
       // Clear max wait timer
@@ -252,7 +333,17 @@ export class EventBus {
         try {
           await entry.listener(payload);
         } catch (error) {
-          console.error("EventBus max-wait listener error:", error);
+          try {
+            const { outputChannel } =
+              await import("../output/outputChannel.js");
+            outputChannel.error(
+              "EVENTS",
+              "EventBus max-wait listener error",
+              error as Error,
+            );
+          } catch {
+            // Final fallback intentionally ignored to avoid recursion or console noise.
+          }
         }
       }, entry.debounce!.maxWait);
     }
