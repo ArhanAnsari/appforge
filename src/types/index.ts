@@ -36,6 +36,7 @@ export interface TreeItemData {
     | "collection";
   label: string;
   id?: string;
+  treeId?: string;
   projectId?: string;
   databaseId?: string;
   parent?: TreeItemData;

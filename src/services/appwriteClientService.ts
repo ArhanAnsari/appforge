@@ -11,20 +11,13 @@ import {
   Storage,
   Teams,
 } from "node-appwrite";
-import { AppwriteProject, StoredProject } from "../types";
+import { AppwriteProject } from "../types";
 
 /**
- * Singleton service for managing Appwrite client connections
+ * Stateless factory for creating project-scoped Appwrite clients and services.
  */
 export class AppwriteClientService {
   private static instance: AppwriteClientService;
-  private client: Client | null = null;
-  private databases: Databases | null = null;
-  private functions: Functions | null = null;
-  private account: Account | null = null;
-  private storage: Storage | null = null;
-  private teams: Teams | null = null;
-  private activeProject: AppwriteProject | null = null;
 
   private constructor() {}
 
@@ -39,106 +32,63 @@ export class AppwriteClientService {
   }
 
   /**
-   * Initialize client with project configuration
+   * Create a new Appwrite client scoped to a single project.
    */
-  public initialize(project: AppwriteProject, apiKey: string): void {
-    this.client = new Client()
+  public getProjectScopedClient(
+    project: AppwriteProject,
+    apiKey: string,
+  ): Client {
+    return new Client()
       .setEndpoint(project.endpoint)
       .setProject(project.projectId)
       .setKey(apiKey);
-
-    // Initialize service clients
-    this.databases = new Databases(this.client);
-    this.functions = new Functions(this.client);
-    this.account = new Account(this.client);
-    this.storage = new Storage(this.client);
-    this.teams = new Teams(this.client);
-
-    this.activeProject = project;
   }
 
   /**
-   * Switch to a different project
+   * Create a project-scoped Databases service.
    */
-  public switchProject(project: AppwriteProject, apiKey: string): void {
-    this.initialize(project, apiKey);
+  public createDatabasesService(
+    project: AppwriteProject,
+    apiKey: string,
+  ): Databases {
+    return new Databases(this.getProjectScopedClient(project, apiKey));
   }
 
   /**
-   * Get the active project
+   * Create a project-scoped Functions service.
    */
-  public getActiveProject(): AppwriteProject | null {
-    return this.activeProject;
+  public createFunctionsService(
+    project: AppwriteProject,
+    apiKey: string,
+  ): Functions {
+    return new Functions(this.getProjectScopedClient(project, apiKey));
   }
 
   /**
-   * Get Databases client
+   * Create a project-scoped Account service.
    */
-  public getDatabases(): Databases {
-    if (!this.databases) {
-      throw new Error("Client not initialized. Call initialize() first.");
-    }
-    return this.databases;
+  public createAccountService(
+    project: AppwriteProject,
+    apiKey: string,
+  ): Account {
+    return new Account(this.getProjectScopedClient(project, apiKey));
   }
 
   /**
-   * Get Functions client
+   * Create a project-scoped Storage service.
    */
-  public getFunctions(): Functions {
-    if (!this.functions) {
-      throw new Error("Client not initialized. Call initialize() first.");
-    }
-    return this.functions;
+  public createStorageService(
+    project: AppwriteProject,
+    apiKey: string,
+  ): Storage {
+    return new Storage(this.getProjectScopedClient(project, apiKey));
   }
 
   /**
-   * Get Account client
+   * Create a project-scoped Teams service.
    */
-  public getAccount(): Account {
-    if (!this.account) {
-      throw new Error("Client not initialized. Call initialize() first.");
-    }
-    return this.account;
-  }
-
-  /**
-   * Get Storage client
-   */
-  public getStorage(): Storage {
-    if (!this.storage) {
-      throw new Error("Client not initialized. Call initialize() first.");
-    }
-    return this.storage;
-  }
-
-  /**
-   * Get Teams client
-   */
-  public getTeams(): Teams {
-    if (!this.teams) {
-      throw new Error("Client not initialized. Call initialize() first.");
-    }
-    return this.teams;
-  }
-
-  /**
-   * Check if client is initialized
-   */
-  public isInitialized(): boolean {
-    return this.client !== null && this.activeProject !== null;
-  }
-
-  /**
-   * Reset client (for logout or project switch)
-   */
-  public reset(): void {
-    this.client = null;
-    this.databases = null;
-    this.functions = null;
-    this.account = null;
-    this.storage = null;
-    this.teams = null;
-    this.activeProject = null;
+  public createTeamsService(project: AppwriteProject, apiKey: string): Teams {
+    return new Teams(this.getProjectScopedClient(project, apiKey));
   }
 }
 

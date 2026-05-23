@@ -8,6 +8,7 @@ import * as vscode from "vscode";
 import { ProjectStorageService } from "../services/projectStorageService";
 import { AppwriteClientService } from "../services/appwriteClientService";
 import { AppForgeTreeDataProvider } from "../providers/treeDataProvider";
+import { refreshManager } from "../core/refresh/refreshManager";
 import { ProjectConfigSchema, ApiKeySchema } from "../utils/validators";
 import { ZodError } from "zod";
 
@@ -121,9 +122,8 @@ export class ProjectSetupPanel {
         return;
       }
 
-      // Create temporary client to test
       const tempClient = AppwriteClientService.getInstance();
-      tempClient.initialize(
+      const databases = tempClient.createDatabasesService(
         {
           projectName: "Test",
           endpoint,
@@ -131,10 +131,6 @@ export class ProjectSetupPanel {
         },
         apiKey,
       );
-
-      // Lightweight test: try to list databases (safe read-only operation)
-      // This doesn't require special scopes like account.get() does
-      const databases = tempClient.getDatabases();
       await databases.list();
 
       this._panel.webview.postMessage({
@@ -173,18 +169,8 @@ export class ProjectSetupPanel {
         apiKey,
       );
 
-      // Initialize client
-      const projects = this.projectStorage.getProjects();
-      if (projects.length === 1) {
-        const projectWithKey =
-          await this.projectStorage.getActiveProjectWithApiKey();
-        if (projectWithKey) {
-          this.appwriteClient.initialize(projectWithKey, projectWithKey.apiKey);
-        }
-      }
-
-      // Refresh tree
-      this.treeProvider.refresh();
+      // Refresh tree through the refresh manager so expansion state is preserved
+      refreshManager.queueRefresh("all");
 
       // Show success and close
       this._panel.webview.postMessage({

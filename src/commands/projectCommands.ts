@@ -9,6 +9,9 @@ import { AppwriteClientService } from "../services/appwriteClientService";
 import { AppForgeTreeDataProvider } from "../providers/treeDataProvider";
 import { SetupGuidePanel } from "../views/setupGuidePanel";
 import { ProjectSetupPanel } from "../views/projectSetupPanel";
+import { EventBus } from "../core/events/eventBus";
+import { outputChannel } from "../core/output/outputChannel";
+import { refreshManager } from "../core/refresh/refreshManager";
 
 /**
  * Register project management commands
@@ -68,8 +71,8 @@ export function registerProjectCommands(
   // Refresh Projects
   context.subscriptions.push(
     vscode.commands.registerCommand("appforge.refreshProjects", async () => {
-      treeProvider.refresh();
-      vscode.window.showInformationMessage("Projects refreshed");
+      refreshManager.queueRefresh("all");
+      outputChannel.success("PROJECTS", "Projects refreshed");
     }),
   );
 
@@ -131,21 +134,28 @@ async function removeProjectCommand(
         cancellable: false,
       },
       async () => {
+        const end = outputChannel.startOperation(
+          "PROJECTS",
+          `Remove project: ${project.projectName}`,
+        );
         await projectStorage.removeProject(projectId);
 
-        // If this was the active project, reset client
-        if (appwriteClient.getActiveProject()?.projectId === projectId) {
-          appwriteClient.reset();
+        // If this was the active project, clear the stored selection
+        if (projectStorage.getActiveProjectId() === projectId) {
+          await projectStorage.setActiveProjectId(undefined);
         }
 
-        treeProvider.refresh();
+        refreshManager.queueRefresh("all");
+        end(true);
       },
     );
 
-    vscode.window.showInformationMessage(
-      `✓ Project "${project.projectName}" removed`,
+    outputChannel.success(
+      "PROJECTS",
+      `Project removed: ${project.projectName}`,
     );
   } catch (error) {
+    outputChannel.error("PROJECTS", "Failed to remove project", error);
     vscode.window.showErrorMessage(
       `Failed to remove project: ${error instanceof Error ? error.message : "Unknown error"}`,
     );
@@ -175,26 +185,43 @@ async function switchProjectCommand(
         cancellable: false,
       },
       async () => {
+        const end = outputChannel.startOperation(
+          "PROJECTS",
+          `Switch to project: ${project.projectName}`,
+        );
         // Get API key
         const apiKey = await projectStorage.getApiKey(projectId);
         if (!apiKey) {
           throw new Error("API key not found in secure storage");
         }
 
+        const databases = appwriteClient.createDatabasesService(
+          project,
+          apiKey,
+        );
+        await databases.list();
+
         // Update active project
         await projectStorage.setActiveProjectId(projectId);
 
-        // Initialize client
-        appwriteClient.initialize(project, apiKey);
+        refreshManager.queueRefresh("all");
 
-        treeProvider.refresh();
+        // Emit event
+        await EventBus.getInstance().emit("project.switched", {
+          projectId,
+          projectName: project.projectName,
+        });
+
+        end(true);
       },
     );
 
-    vscode.window.showInformationMessage(
-      `✓ Switched to "${project.projectName}"`,
+    outputChannel.success(
+      "PROJECTS",
+      `Switched to project: ${project.projectName}`,
     );
   } catch (error) {
+    outputChannel.error("PROJECTS", "Failed to switch project", error);
     vscode.window.showErrorMessage(
       `Failed to switch project: ${error instanceof Error ? error.message : "Unknown error"}`,
     );

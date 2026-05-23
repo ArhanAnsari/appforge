@@ -7,6 +7,9 @@ import * as vscode from "vscode";
 import { AppwriteClientService } from "../services/appwriteClientService";
 import { AppForgeTreeDataProvider } from "../providers/treeDataProvider";
 import { ProjectStorageService } from "../services/projectStorageService";
+import { EventBus } from "../core/events/eventBus";
+import { outputChannel } from "../core/output/outputChannel";
+import { refreshManager } from "../core/refresh/refreshManager";
 import { ID } from "node-appwrite";
 
 /**
@@ -26,8 +29,8 @@ export function registerDatabaseManagementCommands(
         // Handle both tree item context and direct projectId
         const projectId = typeof arg === "string" ? arg : arg?.data?.projectId;
         await createDatabaseCommand(
-          appwriteClient,
           projectStorage,
+          appwriteClient,
           treeProvider,
           projectId,
         );
@@ -45,8 +48,9 @@ export function registerDatabaseManagementCommands(
         const projectId =
           typeof arg === "string" ? undefined : arg?.data?.projectId;
         await deleteDatabaseCommand(
-          appwriteClient,
           treeProvider,
+          projectStorage,
+          appwriteClient,
           databaseId,
           projectId,
         );
@@ -59,16 +63,29 @@ export function registerDatabaseManagementCommands(
  * Create a new database
  */
 async function createDatabaseCommand(
-  appwriteClient: AppwriteClientService,
   projectStorage: ProjectStorageService,
+  appwriteClient: AppwriteClientService,
   treeProvider: AppForgeTreeDataProvider,
   projectId?: string,
 ): Promise<void> {
   try {
-    if (!appwriteClient.isInitialized()) {
+    const resolvedProjectId = projectId ?? projectStorage.getActiveProjectId();
+    if (!resolvedProjectId) {
       vscode.window.showErrorMessage(
-        "No active project. Switch to a project first.",
+        "No project selected. Switch to a project first.",
       );
+      return;
+    }
+
+    const project = projectStorage.getProjectById(resolvedProjectId);
+    if (!project) {
+      vscode.window.showErrorMessage("Project not found");
+      return;
+    }
+
+    const apiKey = await projectStorage.getApiKey(resolvedProjectId);
+    if (!apiKey) {
+      vscode.window.showErrorMessage("API key not found in secure storage");
       return;
     }
 
@@ -112,24 +129,43 @@ async function createDatabaseCommand(
         cancellable: false,
       },
       async () => {
+        let endOperation:
+          | ((success?: boolean, error?: Error) => void)
+          | undefined = undefined;
         try {
-          const databases = appwriteClient.getDatabases();
+          endOperation = outputChannel.startOperation(
+            "DATABASE",
+            `Create database: ${databaseName}`,
+          );
+          const databases = appwriteClient.createDatabasesService(
+            project,
+            apiKey,
+          );
           const db = await databases.create(databaseId, databaseName);
 
-          treeProvider.refresh();
-          vscode.window.showInformationMessage(
-            `✓ Database created: ${databaseName}`,
+          await EventBus.getInstance().emit("database.created", {
+            projectId: resolvedProjectId,
+            databaseId,
+            name: databaseName,
+          });
+
+          refreshManager.queueRefresh("databases");
+          outputChannel.success(
+            "DATABASE",
+            `Database created: ${databaseName}`,
           );
+          endOperation(true);
         } catch (error) {
-          const message =
-            error instanceof Error ? error.message : String(error);
+          outputChannel.error("DATABASE", "Failed to create database", error);
           vscode.window.showErrorMessage(
-            `Failed to create database: ${message}`,
+            `Failed to create database: ${error instanceof Error ? error.message : String(error)}`,
           );
+          endOperation?.(false, error as Error);
         }
       },
     );
   } catch (error) {
+    outputChannel.error("DATABASE", "Create database error", error);
     const message = error instanceof Error ? error.message : String(error);
     vscode.window.showErrorMessage(`Error: ${message}`);
   }
@@ -139,16 +175,30 @@ async function createDatabaseCommand(
  * Delete a database
  */
 async function deleteDatabaseCommand(
-  appwriteClient: AppwriteClientService,
   treeProvider: AppForgeTreeDataProvider,
+  projectStorage: ProjectStorageService,
+  appwriteClient: AppwriteClientService,
   databaseId: string,
   _projectId?: string,
 ): Promise<void> {
   try {
-    if (!appwriteClient.isInitialized()) {
+    const resolvedProjectId = _projectId ?? projectStorage.getActiveProjectId();
+    if (!resolvedProjectId) {
       vscode.window.showErrorMessage(
-        "No active project. Switch to a project first.",
+        "No project selected. Switch to a project first.",
       );
+      return;
+    }
+
+    const project = projectStorage.getProjectById(resolvedProjectId);
+    if (!project) {
+      vscode.window.showErrorMessage("Project not found");
+      return;
+    }
+
+    const apiKey = await projectStorage.getApiKey(resolvedProjectId);
+    if (!apiKey) {
+      vscode.window.showErrorMessage("API key not found in secure storage");
       return;
     }
 
@@ -169,24 +219,39 @@ async function deleteDatabaseCommand(
         cancellable: false,
       },
       async () => {
+        let endOperation:
+          | ((success?: boolean, error?: Error) => void)
+          | undefined = undefined;
         try {
-          const databases = appwriteClient.getDatabases();
+          endOperation = outputChannel.startOperation(
+            "DATABASE",
+            `Delete database: ${databaseId}`,
+          );
+          const databases = appwriteClient.createDatabasesService(
+            project,
+            apiKey,
+          );
           await databases.delete(databaseId);
 
-          treeProvider.refresh();
-          vscode.window.showInformationMessage(
-            `✓ Database deleted: ${databaseId}`,
-          );
+          await EventBus.getInstance().emit("database.deleted", {
+            projectId: resolvedProjectId,
+            databaseId,
+          });
+
+          refreshManager.queueRefresh("databases");
+          outputChannel.success("DATABASE", `Database deleted: ${databaseId}`);
+          endOperation(true);
         } catch (error) {
-          const message =
-            error instanceof Error ? error.message : String(error);
+          outputChannel.error("DATABASE", "Failed to delete database", error);
           vscode.window.showErrorMessage(
-            `Failed to delete database: ${message}`,
+            `Failed to delete database: ${error instanceof Error ? error.message : String(error)}`,
           );
+          endOperation?.(false, error as Error);
         }
       },
     );
   } catch (error) {
+    outputChannel.error("DATABASE", "Delete database error", error);
     const message = error instanceof Error ? error.message : String(error);
     vscode.window.showErrorMessage(`Error: ${message}`);
   }

@@ -9,6 +9,12 @@ import * as path from "path";
 import { AppwriteClientService } from "../services/appwriteClientService";
 import { AppForgeTreeDataProvider } from "../providers/treeDataProvider";
 import type { Runtime } from "node-appwrite";
+import { EventBus } from "../core/events/eventBus";
+import { outputChannel } from "../core/output/outputChannel";
+import { FunctionLogsPanel } from "../views/functionLogsPanel";
+import { ProjectStorageService } from "../services/projectStorageService";
+import { ID } from "node-appwrite";
+import { refreshManager } from "../core/refresh/refreshManager";
 
 /**
  * Register function-related commands
@@ -17,6 +23,7 @@ export function registerFunctionCommands(
   context: vscode.ExtensionContext,
   appwriteClient: AppwriteClientService,
   treeProvider: AppForgeTreeDataProvider,
+  projectStorage: ProjectStorageService,
 ): void {
   // Execute Function
   context.subscriptions.push(
@@ -31,7 +38,13 @@ export function registerFunctionCommands(
           functionId = arg?.data?.id || "";
           projectId = arg?.data?.projectId || "";
         }
-        await executeFunctionCommand(appwriteClient, functionId, projectId);
+        await executeFunctionCommand(
+          appwriteClient,
+          projectStorage,
+          context,
+          functionId,
+          projectId,
+        );
       },
     ),
   );
@@ -41,7 +54,12 @@ export function registerFunctionCommands(
     vscode.commands.registerCommand(
       "appforge.deployFunction",
       async (functionId?: string) => {
-        await deployFunctionCommand(appwriteClient, treeProvider);
+        await deployFunctionCommand(
+          appwriteClient,
+          treeProvider,
+          projectStorage,
+          context,
+        );
       },
     ),
   );
@@ -65,16 +83,21 @@ export function registerFunctionCommands(
  */
 async function executeFunctionCommand(
   appwriteClient: AppwriteClientService,
+  projectStorage: ProjectStorageService,
+  context: vscode.ExtensionContext,
   functionId: string,
   projectId: string,
 ): Promise<void> {
   try {
-    if (!appwriteClient.isInitialized()) {
-      vscode.window.showErrorMessage(
-        "No active project. Switch to a project first.",
-      );
+    const projectContext = await resolveProjectContext(
+      projectStorage,
+      projectId,
+    );
+    if (!projectContext) {
       return;
     }
+
+    const { project, apiKey, projectId: resolvedProjectId } = projectContext;
 
     // Get execution data from user (optional JSON)
     const dataInput = await vscode.window.showInputBox({
@@ -98,6 +121,13 @@ async function executeFunctionCommand(
       data = dataInput;
     }
 
+    const operationId = ID.unique();
+    await EventBus.getInstance().emit("operation.started", {
+      operationType: "function.execute",
+      operationId,
+      timestamp: Date.now(),
+    });
+
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
@@ -106,15 +136,78 @@ async function executeFunctionCommand(
       },
       async () => {
         try {
-          const functions = appwriteClient.getFunctions();
+          const start = Date.now();
+          const functions = appwriteClient.createFunctionsService(
+            project,
+            apiKey,
+          );
           const execution = await functions.createExecution(functionId, data);
 
-          // Show execution result
-          const resultMessage = `✓ Execution complete\n\nStatus: ${execution.status}\nOutput: ${execution.responseBody || "(no output)"}`;
-          vscode.window.showInformationMessage(resultMessage);
+          outputChannel.success(
+            "FUNCTION",
+            `Execution completed: ${execution.$id}`,
+            { functionId, executionId: execution.$id },
+            Date.now() - start,
+          );
+
+          // Emit function executed event
+          await EventBus.getInstance().emit("function.executed", {
+            projectId: resolvedProjectId,
+            functionId,
+            status: execution.status,
+            timestamp: Date.now(),
+          });
+
+          // Auto-open logs panel
+          try {
+            FunctionLogsPanel.createOrShow(
+              context.extensionUri,
+              appwriteClient,
+              projectStorage,
+              resolvedProjectId,
+              functionId,
+              functionId,
+            );
+          } catch (panelErr) {
+            outputChannel.error(
+              "FUNCTION",
+              "Failed to open FunctionLogsPanel",
+              panelErr as Error,
+            );
+          }
+
+          vscode.window.showInformationMessage(
+            `✓ Execution complete — status: ${execution.status}`,
+          );
+          await EventBus.getInstance().emit("operation.completed", {
+            operationType: "function.execute",
+            operationId,
+            success: true,
+            duration: Date.now() - start,
+            timestamp: Date.now(),
+          });
         } catch (error) {
+          outputChannel.error(
+            "FUNCTION",
+            "Failed to execute function",
+            error as Error,
+          );
           const message =
             error instanceof Error ? error.message : String(error);
+          await EventBus.getInstance().emit("error.occurred", {
+            projectId: resolvedProjectId,
+            operation: "function.execute",
+            message,
+            error,
+            timestamp: Date.now(),
+          });
+          await EventBus.getInstance().emit("operation.completed", {
+            operationType: "function.execute",
+            operationId,
+            success: false,
+            duration: 0,
+            timestamp: Date.now(),
+          });
           vscode.window.showErrorMessage(
             `Failed to execute function: ${message}`,
           );
@@ -133,14 +226,16 @@ async function executeFunctionCommand(
 async function deployFunctionCommand(
   appwriteClient: AppwriteClientService,
   treeProvider: AppForgeTreeDataProvider,
+  projectStorage: ProjectStorageService,
+  context: vscode.ExtensionContext,
 ): Promise<void> {
   try {
-    if (!appwriteClient.isInitialized()) {
-      vscode.window.showErrorMessage(
-        "No active project. Switch to a project first.",
-      );
+    const projectContext = await resolveProjectContext(projectStorage);
+    if (!projectContext) {
       return;
     }
+
+    const { project, apiKey, projectId: resolvedProjectId } = projectContext;
 
     // Step 1: Get function details
     const functionId = await vscode.window.showInputBox({
@@ -238,6 +333,13 @@ async function deployFunctionCommand(
       });
     }
 
+    const operationId = ID.unique();
+    await EventBus.getInstance().emit("operation.started", {
+      operationType: "function.deploy",
+      operationId,
+      timestamp: Date.now(),
+    });
+
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
@@ -246,22 +348,49 @@ async function deployFunctionCommand(
       },
       async () => {
         try {
-          const functions = appwriteClient.getFunctions();
+          const functions = appwriteClient.createFunctionsService(
+            project,
+            apiKey,
+          );
 
           // Create the function
           let functionObj;
           try {
+            const start = Date.now();
             functionObj = await functions.create(
               functionId,
               functionName,
               runtime.value as Runtime,
             );
+            outputChannel.success(
+              "FUNCTION",
+              `Function created: ${functionId}`,
+              { functionId },
+              Date.now() - start,
+            );
+            await EventBus.getInstance().emit("function.deployed", {
+              projectId: resolvedProjectId,
+              functionId,
+              name: functionName,
+              timestamp: Date.now(),
+            });
+            await EventBus.getInstance().emit("operation.completed", {
+              operationType: "function.deploy",
+              operationId,
+              success: true,
+              duration: Date.now() - start,
+              timestamp: Date.now(),
+            });
           } catch (createError) {
             // Function might already exist
             if (
               createError instanceof Error &&
               createError.message.includes("already exists")
             ) {
+              outputChannel.info(
+                "FUNCTION",
+                `Function exists, updating: ${functionId}`,
+              );
               vscode.window.showInformationMessage(
                 `Function '${functionId}' already exists. Updating...`,
               );
@@ -271,34 +400,39 @@ async function deployFunctionCommand(
           }
 
           // Show deployment info
-          const channel = vscode.window.createOutputChannel(
-            "AppForge - Function Deploy",
-          );
-          channel.clear();
-          channel.appendLine(`✓ Function Created/Updated: ${functionName}`);
-          channel.appendLine(`ID: ${functionId}`);
-          channel.appendLine(`Runtime: ${runtime.value}`);
-          channel.appendLine(`Folder: ${folderPath}\n`);
+          outputChannel.info("FUNCTION", `Function ready: ${functionName}`);
+          outputChannel.table("FUNCTION", `Function details: ${functionName}`, [
+            { id: functionId, runtime: runtime.value, folder: folderPath },
+          ]);
 
-          if (Object.keys(envVars).length > 0) {
-            channel.appendLine("Environment Variables:");
-            Object.entries(envVars).forEach(([key, value]) => {
-              channel.appendLine(`  ${key}=${value}`);
-            });
-            channel.appendLine("");
+          refreshManager.queueRefresh("functions");
+          refreshManager.queueRefresh("logs");
+
+          // Emit logs.updated to trigger logs panel if listening
+          await EventBus.getInstance().emit("logs.updated", {
+            projectId: resolvedProjectId,
+            functionId,
+            logs: [],
+            timestamp: Date.now(),
+          });
+
+          // Auto-open logs panel after deploy
+          try {
+            FunctionLogsPanel.createOrShow(
+              context.extensionUri,
+              appwriteClient,
+              projectStorage,
+              resolvedProjectId,
+              functionId,
+              functionName,
+            );
+          } catch (panelErr) {
+            outputChannel.error(
+              "FUNCTION",
+              "Failed to open FunctionLogsPanel after deploy",
+              panelErr as Error,
+            );
           }
-
-          channel.appendLine("Next steps:");
-          channel.appendLine("1. Install dependencies in your function folder");
-          channel.appendLine("2. Use Appwrite CLI to deploy: appwrite deploy");
-          channel.appendLine("3. Or use Appwrite console to upload code");
-          channel.appendLine("");
-          channel.appendLine(
-            "For more info: https://appwrite.io/docs/functions",
-          );
-
-          channel.show(vscode.ViewColumn.Beside);
-          treeProvider.refresh();
 
           vscode.window.showInformationMessage(
             `✓ Function '${functionName}' is ready to deploy!`,
@@ -326,13 +460,6 @@ async function viewLogsCommand(
   projectId: string,
 ): Promise<void> {
   try {
-    if (!appwriteClient.isInitialized()) {
-      vscode.window.showErrorMessage(
-        "No active project. Switch to a project first.",
-      );
-      return;
-    }
-
     // For alpha, show placeholder
     const message = `Logs View
     
@@ -351,4 +478,35 @@ For now, view logs in your Appwrite console.`;
     const message = error instanceof Error ? error.message : String(error);
     vscode.window.showErrorMessage(`Error: ${message}`);
   }
+}
+
+async function resolveProjectContext(
+  projectStorage: ProjectStorageService,
+  explicitProjectId?: string,
+): Promise<{
+  project: NonNullable<ReturnType<ProjectStorageService["getProjectById"]>>;
+  apiKey: string;
+  projectId: string;
+} | null> {
+  const projectId = explicitProjectId ?? projectStorage.getActiveProjectId();
+  if (!projectId) {
+    vscode.window.showErrorMessage(
+      "No project selected. Switch to a project first.",
+    );
+    return null;
+  }
+
+  const project = projectStorage.getProjectById(projectId);
+  if (!project) {
+    vscode.window.showErrorMessage("Project not found");
+    return null;
+  }
+
+  const apiKey = await projectStorage.getApiKey(projectId);
+  if (!apiKey) {
+    vscode.window.showErrorMessage("API key not found in secure storage");
+    return null;
+  }
+
+  return { project, apiKey, projectId };
 }

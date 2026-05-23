@@ -8,6 +8,9 @@ import { AppwriteClientService } from "../services/appwriteClientService";
 import { AppForgeTreeDataProvider } from "../providers/treeDataProvider";
 import { ProjectStorageService } from "../services/projectStorageService";
 import { ID, Query } from "node-appwrite";
+import { EventBus } from "../core/events/eventBus";
+import { outputChannel } from "../core/output/outputChannel";
+import { refreshManager } from "../core/refresh/refreshManager";
 
 /**
  * Register database-related commands
@@ -21,8 +24,17 @@ export function registerDatabaseCommands(
   // Refresh Databases
   context.subscriptions.push(
     vscode.commands.registerCommand("appforge.refreshDatabases", async () => {
-      treeProvider.refresh();
-      vscode.window.showInformationMessage("✓ Databases refreshed");
+      // Use RefreshManager to orchestrate a debounced scoped refresh
+      refreshManager.queueRefresh("databases");
+      outputChannel.success("DATABASE", "Databases refresh queued");
+      await EventBus.getInstance().emit("refresh.requested", {
+        scope: "databases",
+      });
+      await EventBus.getInstance().emit("refresh.completed", {
+        projectId: projectStorage.getActiveProjectId(),
+        scope: "databases",
+        duration: 0,
+      });
     }),
   );
 
@@ -46,6 +58,7 @@ export function registerDatabaseCommands(
           treeProvider,
           databaseId,
           collectionId,
+          typeof arg === "string" ? undefined : arg?.data?.projectId,
         );
       },
     ),
@@ -70,6 +83,7 @@ export function registerDatabaseCommands(
           projectStorage,
           databaseId,
           collectionId,
+          typeof arg === "string" ? undefined : arg?.data?.projectId,
         );
       },
     ),
@@ -97,6 +111,7 @@ export function registerDatabaseCommands(
           databaseId,
           collectionId,
           documentId,
+          typeof arg === "string" ? undefined : arg?.data?.projectId,
         );
       },
     ),
@@ -124,6 +139,7 @@ export function registerDatabaseCommands(
           databaseId,
           collectionId,
           documentId,
+          typeof arg === "string" ? undefined : arg?.data?.projectId,
         );
       },
     ),
@@ -139,14 +155,18 @@ async function createDocumentCommand(
   treeProvider: AppForgeTreeDataProvider,
   databaseId: string,
   collectionId: string,
+  projectId?: string,
 ): Promise<void> {
   try {
-    if (!appwriteClient.isInitialized()) {
-      vscode.window.showErrorMessage(
-        "No active project. Switch to a project first.",
-      );
+    const projectContext = await resolveProjectContext(
+      projectStorage,
+      projectId,
+    );
+    if (!projectContext) {
       return;
     }
+
+    const { project, apiKey, projectId: resolvedProjectId } = projectContext;
 
     // Get JSON input from user
     const jsonInput = await vscode.window.showInputBox({
@@ -171,6 +191,11 @@ async function createDocumentCommand(
 
     const documentData = JSON.parse(jsonInput);
 
+    const operationId = ID.unique();
+    await EventBus.getInstance().emit("operation.started", {
+      operationType: "document.create",
+      operationId,
+    });
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
@@ -179,21 +204,66 @@ async function createDocumentCommand(
       },
       async () => {
         try {
-          const databases = appwriteClient.getDatabases();
+          const nodeKey = `col:${resolvedProjectId}:${databaseId}:${collectionId}`;
+          // optimistic loading indicator
+          refreshManager.notifyLoadingChange(nodeKey, true);
+          const start = Date.now();
+          const databases = appwriteClient.createDatabasesService(
+            project,
+            apiKey,
+          );
+          const newId = ID.unique();
           const doc = await databases.createDocument(
             databaseId,
             collectionId,
-            ID.unique(),
+            newId,
             documentData,
           );
 
-          treeProvider.refresh();
-          vscode.window.showInformationMessage(
-            `✓ Document created: ${doc.$id}`,
-          );
+          await EventBus.getInstance().emit("document.created", {
+            projectId: resolvedProjectId,
+            databaseId,
+            collectionId,
+            documentId: doc.$id,
+            timestamp: Date.now(),
+          });
+
+          // mark node refreshed and request a scoped refresh
+          refreshManager.markRefreshed(nodeKey);
+          refreshManager.notifyLoadingChange(nodeKey, false);
+          refreshManager.queueRefresh("specific", nodeKey);
+          outputChannel.success("DATABASE", `Document created: ${doc.$id}`);
+          await EventBus.getInstance().emit("operation.completed", {
+            operationType: "document.create",
+            operationId,
+            success: true,
+            duration: Date.now() - start,
+          });
         } catch (error) {
+          outputChannel.error(
+            "DATABASE",
+            "Failed to create document",
+            error as Error,
+          );
           const message =
             error instanceof Error ? error.message : String(error);
+          await EventBus.getInstance().emit("error.occurred", {
+            projectId: resolvedProjectId,
+            operation: "document.create",
+            message,
+            error,
+          });
+          await EventBus.getInstance().emit("operation.completed", {
+            operationType: "document.create",
+            operationId,
+            success: false,
+            duration: 0,
+          });
+          // clear loading state on failure
+          try {
+            const nodeKey = `col:${resolvedProjectId}:${databaseId}:${collectionId}`;
+            refreshManager.notifyLoadingChange(nodeKey, false);
+          } catch {}
           vscode.window.showErrorMessage(
             `Failed to create document: ${message}`,
           );
@@ -216,14 +286,18 @@ async function deleteDocumentCommand(
   databaseId: string,
   collectionId: string,
   documentId: string,
+  projectId?: string,
 ): Promise<void> {
   try {
-    if (!appwriteClient.isInitialized()) {
-      vscode.window.showErrorMessage(
-        "No active project. Switch to a project first.",
-      );
+    const projectContext = await resolveProjectContext(
+      projectStorage,
+      projectId,
+    );
+    if (!projectContext) {
       return;
     }
+
+    const { project, apiKey, projectId: resolvedProjectId } = projectContext;
 
     const confirmation = await vscode.window.showWarningMessage(
       `Delete document "${documentId}"? This cannot be undone.`,
@@ -243,17 +317,60 @@ async function deleteDocumentCommand(
       },
       async () => {
         try {
-          const databases = appwriteClient.getDatabases();
+          const nodeKey = `col:${resolvedProjectId}:${databaseId}:${collectionId}`;
+          refreshManager.notifyLoadingChange(nodeKey, true);
+
+          const databases = appwriteClient.createDatabasesService(
+            project,
+            apiKey,
+          );
           await databases.deleteDocument(databaseId, collectionId, documentId);
 
-          treeProvider.refresh();
-          vscode.window.showInformationMessage("✓ Document deleted");
+          await EventBus.getInstance().emit("document.deleted", {
+            projectId: resolvedProjectId,
+            databaseId,
+            collectionId,
+            documentId,
+            timestamp: Date.now(),
+          });
+
+          refreshManager.markRefreshed(nodeKey);
+          refreshManager.notifyLoadingChange(nodeKey, false);
+          refreshManager.queueRefresh("specific", nodeKey);
+          outputChannel.success("DATABASE", `Document deleted: ${documentId}`);
+          await EventBus.getInstance().emit("operation.completed", {
+            operationType: "document.delete",
+            operationId: ID.unique(),
+            success: true,
+            duration: 0,
+          });
         } catch (error) {
+          outputChannel.error(
+            "DATABASE",
+            "Failed to delete document",
+            error as Error,
+          );
           const message =
             error instanceof Error ? error.message : String(error);
+          await EventBus.getInstance().emit("error.occurred", {
+            projectId: resolvedProjectId,
+            operation: "document.delete",
+            message,
+            error,
+          });
+          await EventBus.getInstance().emit("operation.completed", {
+            operationType: "document.delete",
+            operationId: ID.unique(),
+            success: false,
+            duration: 0,
+          });
           vscode.window.showErrorMessage(
             `Failed to delete document: ${message}`,
           );
+          try {
+            const nodeKey = `col:${resolvedProjectId}:${databaseId}:${collectionId}`;
+            refreshManager.notifyLoadingChange(nodeKey, false);
+          } catch {}
         }
       },
     );
@@ -271,14 +388,18 @@ async function listDocumentsCommand(
   projectStorage: ProjectStorageService,
   databaseId: string,
   collectionId: string,
+  projectId?: string,
 ): Promise<void> {
   try {
-    if (!appwriteClient.isInitialized()) {
-      vscode.window.showErrorMessage(
-        "No active project. Switch to a project first.",
-      );
+    const projectContext = await resolveProjectContext(
+      projectStorage,
+      projectId,
+    );
+    if (!projectContext) {
       return;
     }
+
+    const { project, apiKey, projectId: resolvedProjectId } = projectContext;
 
     await vscode.window.withProgress(
       {
@@ -288,36 +409,59 @@ async function listDocumentsCommand(
       },
       async () => {
         try {
-          const databases = appwriteClient.getDatabases();
+          const nodeKey = `col:${resolvedProjectId}:${databaseId}:${collectionId}`;
+          refreshManager.notifyLoadingChange(nodeKey, true);
+
+          const databases = appwriteClient.createDatabasesService(
+            project,
+            apiKey,
+          );
+          const start = Date.now();
           const docs = await databases.listDocuments(databaseId, collectionId, [
             Query.limit(100),
           ]);
 
-          const channel = vscode.window.createOutputChannel(
-            "AppForge - Documents",
+          outputChannel.table(
+            "DATABASE",
+            `Documents in Collection: ${collectionId}`,
+            docs.documents || [],
           );
-          channel.clear();
-          channel.appendLine(`📋 Documents in Collection: ${collectionId}`);
-          channel.appendLine(`Total: ${docs.total}\n`);
-
-          if (docs.documents.length === 0) {
-            channel.appendLine("No documents found.");
-          } else {
-            docs.documents.forEach((doc) => {
-              channel.appendLine(`ID: ${doc.$id}`);
-              channel.appendLine(`Created: ${doc.$createdAt}`);
-              channel.appendLine(`Data: ${JSON.stringify(doc, null, 2)}`);
-              channel.appendLine("---");
-            });
-          }
-
-          channel.show(vscode.ViewColumn.Beside);
-          vscode.window.showInformationMessage(
-            `✓ Loaded ${docs.documents.length} documents`,
+          outputChannel.success(
+            "DATABASE",
+            `Loaded ${docs.documents.length} documents`,
+            { collectionId },
+            Date.now() - start,
           );
+          // mark refreshed and clear loading
+          refreshManager.markRefreshed(nodeKey);
+          refreshManager.notifyLoadingChange(nodeKey, false);
+          refreshManager.queueRefresh("specific", nodeKey);
+          await EventBus.getInstance().emit("operation.completed", {
+            operationType: "documents.list",
+            operationId: ID.unique(),
+            success: true,
+            duration: Date.now() - start,
+          });
         } catch (error) {
+          outputChannel.error(
+            "DATABASE",
+            "Failed to list documents",
+            error as Error,
+          );
           const message =
             error instanceof Error ? error.message : String(error);
+          await EventBus.getInstance().emit("error.occurred", {
+            projectId: resolvedProjectId,
+            operation: "documents.list",
+            message,
+            error,
+          });
+          await EventBus.getInstance().emit("operation.completed", {
+            operationType: "documents.list",
+            operationId: ID.unique(),
+            success: false,
+            duration: 0,
+          });
           vscode.window.showErrorMessage(
             `Failed to list documents: ${message}`,
           );
@@ -340,14 +484,18 @@ async function updateDocumentCommand(
   databaseId: string,
   collectionId: string,
   documentId: string,
+  projectId?: string,
 ): Promise<void> {
   try {
-    if (!appwriteClient.isInitialized()) {
-      vscode.window.showErrorMessage(
-        "No active project. Switch to a project first.",
-      );
+    const projectContext = await resolveProjectContext(
+      projectStorage,
+      projectId,
+    );
+    if (!projectContext) {
       return;
     }
+
+    const { project, apiKey, projectId: resolvedProjectId } = projectContext;
 
     // First fetch the current document
     let currentDoc: Record<string, unknown> | null = null;
@@ -359,7 +507,10 @@ async function updateDocumentCommand(
       },
       async () => {
         try {
-          const databases = appwriteClient.getDatabases();
+          const databases = appwriteClient.createDatabasesService(
+            project,
+            apiKey,
+          );
           currentDoc = (await databases.getDocument(
             databaseId,
             collectionId,
@@ -411,7 +562,14 @@ async function updateDocumentCommand(
       },
       async () => {
         try {
-          const databases = appwriteClient.getDatabases();
+          const nodeKey = `col:${resolvedProjectId}:${databaseId}:${collectionId}`;
+          refreshManager.notifyLoadingChange(nodeKey, true);
+
+          const databases = appwriteClient.createDatabasesService(
+            project,
+            apiKey,
+          );
+          const start = Date.now();
           await databases.updateDocument(
             databaseId,
             collectionId,
@@ -419,16 +577,51 @@ async function updateDocumentCommand(
             updatedData,
           );
 
-          treeProvider.refresh();
-          vscode.window.showInformationMessage(
-            `✓ Document updated: ${documentId}`,
-          );
+          await EventBus.getInstance().emit("document.updated", {
+            projectId: resolvedProjectId,
+            databaseId,
+            collectionId,
+            documentId,
+            timestamp: Date.now(),
+          });
+
+          refreshManager.markRefreshed(nodeKey);
+          refreshManager.notifyLoadingChange(nodeKey, false);
+          refreshManager.queueRefresh("specific", nodeKey);
+          outputChannel.success("DATABASE", `Document updated: ${documentId}`);
+          await EventBus.getInstance().emit("operation.completed", {
+            operationType: "document.update",
+            operationId: ID.unique(),
+            success: true,
+            duration: Date.now() - start,
+          });
         } catch (error) {
+          outputChannel.error(
+            "DATABASE",
+            "Failed to update document",
+            error as Error,
+          );
           const message =
             error instanceof Error ? error.message : String(error);
+          await EventBus.getInstance().emit("error.occurred", {
+            projectId: resolvedProjectId,
+            operation: "document.update",
+            message,
+            error,
+          });
+          await EventBus.getInstance().emit("operation.completed", {
+            operationType: "document.update",
+            operationId: ID.unique(),
+            success: false,
+            duration: 0,
+          });
           vscode.window.showErrorMessage(
             `Failed to update document: ${message}`,
           );
+          try {
+            const nodeKey = `col:${resolvedProjectId}:${databaseId}:${collectionId}`;
+            refreshManager.notifyLoadingChange(nodeKey, false);
+          } catch {}
         }
       },
     );
@@ -436,4 +629,35 @@ async function updateDocumentCommand(
     const message = error instanceof Error ? error.message : String(error);
     vscode.window.showErrorMessage(`Error: ${message}`);
   }
+}
+
+async function resolveProjectContext(
+  projectStorage: ProjectStorageService,
+  explicitProjectId?: string,
+): Promise<{
+  project: NonNullable<ReturnType<ProjectStorageService["getProjectById"]>>;
+  apiKey: string;
+  projectId: string;
+} | null> {
+  const projectId = explicitProjectId ?? projectStorage.getActiveProjectId();
+  if (!projectId) {
+    vscode.window.showErrorMessage(
+      "No project selected. Switch to a project first.",
+    );
+    return null;
+  }
+
+  const project = projectStorage.getProjectById(projectId);
+  if (!project) {
+    vscode.window.showErrorMessage("Project not found");
+    return null;
+  }
+
+  const apiKey = await projectStorage.getApiKey(projectId);
+  if (!apiKey) {
+    vscode.window.showErrorMessage("API key not found in secure storage");
+    return null;
+  }
+
+  return { project, apiKey, projectId };
 }
