@@ -2,15 +2,16 @@
  * AppForge VS Code Extension
  * Appwrite-native developer cockpit inside VS Code
  *
- * Version: 0.1.0-alpha
+ * Version: 0.2.0-alpha
  *
  * This extension provides a complete project management interface for Appwrite,
- * enabling developers to manage databases, functions, and more without leaving VS Code.
+ * enabling developers to manage databases, functions, storage, and more without leaving VS Code.
  */
 
 import * as vscode from "vscode";
 import { ProjectStorageService } from "./services/projectStorageService";
 import { AppwriteClientService } from "./services/appwriteClientService";
+import { StatusBarService } from "./services/statusBarService";
 import { AppForgeTreeDataProvider } from "./providers/treeDataProvider";
 import { registerProjectCommands } from "./commands/projectCommands";
 import { registerDatabaseCommands } from "./commands/databaseCommands";
@@ -18,6 +19,9 @@ import { registerDatabaseManagementCommands } from "./commands/databaseManagemen
 import { registerDatabaseViewerCommands } from "./commands/databaseViewerCommands";
 import { registerFunctionCommands } from "./commands/functionCommands";
 import { registerDiagnosticsCommands } from "./commands/diagnosticsCommands";
+import { registerStorageCommands } from "./commands/storageCommands";
+import { registerDatabaseCreationCommands } from "./commands/databaseCreationCommands";
+import { registerResourceCommands } from "./commands/resourceCommands";
 import { logger } from "./utils/logger";
 import { outputChannel } from "./core/output/outputChannel";
 
@@ -28,18 +32,22 @@ export function activate(context: vscode.ExtensionContext) {
   logger.initialize();
   logger.success(
     "EXTENSION",
-    "🚀 AppForge extension is now active (v0.1.1-alpha)",
+    "🚀 AppForge extension is now active (v0.2.0-alpha)",
   );
   outputChannel.initialize();
   outputChannel.info(
     "EXTENSION",
-    "AppForge extension is now active (v0.1.1-alpha)",
+    "AppForge extension is now active (v0.2.0-alpha)",
   );
 
   try {
     // Initialize services
     const projectStorage = new ProjectStorageService(context, context.secrets);
     const appwriteClient = AppwriteClientService.getInstance();
+    const statusBar = new StatusBarService(projectStorage);
+
+    // Show the status bar
+    statusBar.show();
 
     // Initialize tree data provider for sidebar
     const treeDataProvider = new AppForgeTreeDataProvider(
@@ -87,9 +95,31 @@ export function activate(context: vscode.ExtensionContext) {
       projectStorage,
     );
     registerDiagnosticsCommands(context, projectStorage, appwriteClient);
+    registerStorageCommands(
+      context,
+      projectStorage,
+      appwriteClient,
+      treeDataProvider,
+    );
+    registerDatabaseCreationCommands(
+      context,
+      projectStorage,
+      appwriteClient,
+      treeDataProvider,
+    );
+    registerResourceCommands(
+      context,
+      projectStorage,
+      appwriteClient,
+      treeDataProvider,
+    );
 
     // Auto-load active project on activation
     loadActiveProjectOnActivation(projectStorage);
+
+    // Dispose on extension deactivation
+    context.subscriptions.push(statusBar);
+    context.subscriptions.push(treeView);
 
     logger.success("EXTENSION", "✓ AppForge initialized successfully");
     outputChannel.success("EXTENSION", "AppForge initialized successfully");

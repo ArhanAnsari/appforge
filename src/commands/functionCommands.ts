@@ -63,19 +63,6 @@ export function registerFunctionCommands(
       },
     ),
   );
-
-  // View Logs
-  context.subscriptions.push(
-    vscode.commands.registerCommand("appforge.viewLogs", async (arg: any) => {
-      let projectId: string;
-      if (typeof arg === "string") {
-        projectId = arg;
-      } else {
-        projectId = arg?.data?.projectId || "";
-      }
-      await viewLogsCommand(appwriteClient, projectId);
-    }),
-  );
 }
 
 /**

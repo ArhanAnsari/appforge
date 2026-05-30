@@ -45,10 +45,46 @@ export class AppForgeTreeItem extends vscode.TreeItem {
         return `database:${data.projectId ?? ""}:${data.id ?? data.label}`;
       case "collection":
         return `collection:${data.projectId ?? ""}:${data.databaseId ?? ""}:${data.id ?? data.label}`;
+      case "attributes":
+        return `attributes:${data.projectId ?? ""}:${data.collectionId ?? ""}`;
+      case "attribute":
+        return `attribute:${data.projectId ?? ""}:${data.collectionId ?? ""}:${data.id ?? data.label}`;
+      case "indexes":
+        return `indexes:${data.projectId ?? ""}:${data.collectionId ?? ""}`;
+      case "index":
+        return `index:${data.projectId ?? ""}:${data.collectionId ?? ""}:${data.id ?? data.label}`;
+      case "documents":
+        return `documents:${data.projectId ?? ""}:${data.collectionId ?? ""}`;
+      case "document":
+        return `document:${data.projectId ?? ""}:${data.collectionId ?? ""}:${data.id ?? data.label}`;
       case "functions":
         return data.id
           ? `function:${data.projectId ?? ""}:${data.id}`
           : `functions:${data.projectId ?? data.label}`;
+      case "function":
+        return `function:${data.projectId ?? ""}:${data.id ?? data.label}`;
+      case "deployments":
+        return `deployments:${data.projectId ?? ""}:${data.functionId ?? ""}`;
+      case "deployment":
+        return `deployment:${data.projectId ?? ""}:${data.functionId ?? ""}:${data.id ?? data.label}`;
+      case "executions":
+        return `executions:${data.projectId ?? ""}:${data.functionId ?? ""}`;
+      case "execution":
+        return `execution:${data.projectId ?? ""}:${data.functionId ?? ""}:${data.id ?? data.label}`;
+      case "variables":
+        return `variables:${data.projectId ?? ""}:${data.functionId ?? ""}`;
+      case "variable":
+        return `variable:${data.projectId ?? ""}:${data.functionId ?? ""}:${data.id ?? data.label}`;
+      case "storage":
+        return `storage:${data.projectId ?? data.label}`;
+      case "buckets":
+        return `buckets:${data.projectId ?? data.label}`;
+      case "bucket":
+        return `bucket:${data.projectId ?? ""}:${data.id ?? data.label}`;
+      case "files":
+        return `files:${data.projectId ?? ""}:${data.bucketId ?? ""}`;
+      case "file":
+        return `file:${data.projectId ?? ""}:${data.bucketId ?? ""}:${data.id ?? data.label}`;
       case "logs":
         return `logs:${data.projectId ?? data.label}`;
       case "root":
@@ -95,8 +131,44 @@ export class AppForgeTreeItem extends vscode.TreeItem {
         return "table";
       case "collection":
         return "list-unordered";
+      case "attributes":
+        return "symbol-field";
+      case "attribute":
+        return "symbol-field";
+      case "indexes":
+        return "symbol-key";
+      case "index":
+        return "symbol-key";
+      case "documents":
+        return "files";
+      case "document":
+        return "file";
       case "functions":
         return "code";
+      case "function":
+        return "symbol-function";
+      case "deployments":
+        return "rocket";
+      case "deployment":
+        return "rocket";
+      case "executions":
+        return "run";
+      case "execution":
+        return "run";
+      case "variables":
+        return "symbol-variable";
+      case "variable":
+        return "symbol-variable";
+      case "storage":
+        return "cloud";
+      case "buckets":
+        return "folder";
+      case "bucket":
+        return "folder";
+      case "files":
+        return "files";
+      case "file":
+        return "file";
       case "logs":
         return "list-flat";
       default:
@@ -266,6 +338,37 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
         return collectionChildren;
       }
 
+      // Collection children (attributes, indexes, documents)
+      if (element.data.type === "collection") {
+        const collectionDetailsChildren =
+          await this.getCollectionDetailsChildren(element);
+        outputChannel.debug("TREE", "Returning collection details children", {
+          projectId: element.data.projectId,
+          collectionId: element.data.id,
+          count: collectionDetailsChildren.length,
+          childIds: collectionDetailsChildren.map((child) => child.id),
+        });
+        return collectionDetailsChildren;
+      }
+
+      // Attributes children
+      if (element.data.type === "attributes") {
+        const attributeChildren = await this.getAttributesChildren(element);
+        return attributeChildren;
+      }
+
+      // Indexes children
+      if (element.data.type === "indexes") {
+        const indexChildren = await this.getIndexesChildren(element);
+        return indexChildren;
+      }
+
+      // Documents children
+      if (element.data.type === "documents") {
+        const documentChildren = await this.getDocumentsChildren(element);
+        return documentChildren;
+      }
+
       // Functions section
       if (element.data.type === "functions") {
         const functionChildren = await this.getFunctionsChildren(element);
@@ -275,6 +378,49 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
           childIds: functionChildren.map((child) => child.id),
         });
         return functionChildren;
+      }
+
+      // Function children (deployments, executions, variables)
+      if (element.data.type === "function") {
+        const functionDetailsChildren =
+          await this.getFunctionDetailsChildren(element);
+        return functionDetailsChildren;
+      }
+
+      // Deployments children
+      if (element.data.type === "deployments") {
+        const deploymentChildren = await this.getDeploymentsChildren(element);
+        return deploymentChildren;
+      }
+
+      // Executions children
+      if (element.data.type === "executions") {
+        const executionChildren = await this.getExecutionsChildren(element);
+        return executionChildren;
+      }
+
+      // Variables children
+      if (element.data.type === "variables") {
+        const variableChildren = await this.getVariablesChildren(element);
+        return variableChildren;
+      }
+
+      // Storage/Buckets section
+      if (element.data.type === "buckets") {
+        const bucketChildren = await this.getBucketsChildren(element);
+        return bucketChildren;
+      }
+
+      // Bucket children (files)
+      if (element.data.type === "bucket") {
+        const fileChildren = await this.getFilesChildren(element);
+        return fileChildren;
+      }
+
+      // Files children
+      if (element.data.type === "files") {
+        const fileChildren = await this.getFilesChildren(element);
+        return fileChildren;
       }
 
       return [];
@@ -397,6 +543,25 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
           ? vscode.TreeItemCollapsibleState.Expanded
           : vscode.TreeItemCollapsibleState.Collapsed,
         functionsData,
+        this.extensionUri,
+      ),
+    );
+
+    // Storage section (NEW for v0.2.0)
+    const storageData: TreeItemData = {
+      type: "buckets",
+      label: "Storage",
+      projectId,
+      treeId: `buckets:${projectId}`,
+    };
+    const storageNodeId = `buckets:${projectId}`;
+    children.push(
+      new AppForgeTreeItem(
+        "☁️ Storage",
+        this.isExpanded(storageNodeId)
+          ? vscode.TreeItemCollapsibleState.Expanded
+          : vscode.TreeItemCollapsibleState.Collapsed,
+        storageData,
         this.extensionUri,
       ),
     );
@@ -944,6 +1109,651 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
         "Error in getFunctionsChildren",
         error as Error,
       );
+      return [];
+    }
+  }
+
+  private async getCollectionDetailsChildren(
+    element: AppForgeTreeItem,
+  ): Promise<AppForgeTreeItem[]> {
+    const children: AppForgeTreeItem[] = [];
+    const projectId = element.data.projectId;
+    const databaseId = element.data.databaseId;
+    const collectionId = element.data.id;
+
+    // Attributes section
+    const attributesData: TreeItemData = {
+      type: "attributes",
+      label: "Attributes",
+      projectId,
+      collectionId,
+      databaseId,
+      treeId: `attributes:${projectId}:${collectionId}`,
+    };
+    children.push(
+      new AppForgeTreeItem(
+        "🏷️ Attributes",
+        this.isExpanded(`attributes:${projectId}:${collectionId}`)
+          ? vscode.TreeItemCollapsibleState.Expanded
+          : vscode.TreeItemCollapsibleState.Collapsed,
+        attributesData,
+        this.extensionUri,
+      ),
+    );
+
+    // Indexes section
+    const indexesData: TreeItemData = {
+      type: "indexes",
+      label: "Indexes",
+      projectId,
+      collectionId,
+      databaseId,
+      treeId: `indexes:${projectId}:${collectionId}`,
+    };
+    children.push(
+      new AppForgeTreeItem(
+        "🔑 Indexes",
+        this.isExpanded(`indexes:${projectId}:${collectionId}`)
+          ? vscode.TreeItemCollapsibleState.Expanded
+          : vscode.TreeItemCollapsibleState.Collapsed,
+        indexesData,
+        this.extensionUri,
+      ),
+    );
+
+    // Documents section
+    const documentsData: TreeItemData = {
+      type: "documents",
+      label: "Documents",
+      projectId,
+      collectionId,
+      databaseId,
+      treeId: `documents:${projectId}:${collectionId}`,
+    };
+    children.push(
+      new AppForgeTreeItem(
+        "📄 Documents",
+        this.isExpanded(`documents:${projectId}:${collectionId}`)
+          ? vscode.TreeItemCollapsibleState.Expanded
+          : vscode.TreeItemCollapsibleState.Collapsed,
+        documentsData,
+        this.extensionUri,
+      ),
+    );
+
+    return children;
+  }
+
+  private async getAttributesChildren(
+    element: AppForgeTreeItem,
+  ): Promise<AppForgeTreeItem[]> {
+    const projectId = element.data.projectId;
+    const collectionId = element.data.collectionId;
+    const databaseId = element.data.databaseId;
+
+    if (!projectId || !collectionId || !databaseId) {
+      return [];
+    }
+
+    try {
+      const project = this.projectStorage.getProjectById(projectId);
+      if (!project) return [];
+
+      const apiKey = await this.projectStorage.getApiKey(projectId);
+      if (!apiKey) return [];
+
+      const { DatabaseService } =
+        await import("../services/databaseService.js");
+      const dbService = new DatabaseService(project, apiKey);
+      const { attributes } = await dbService.getCollectionDetails(
+        databaseId,
+        collectionId,
+      );
+
+      if (attributes.length === 0) {
+        return [
+          new AppForgeTreeItem(
+            "No attributes",
+            vscode.TreeItemCollapsibleState.None,
+            {
+              type: "attribute",
+              label: "No attributes",
+              projectId,
+              collectionId,
+              treeId: `attribute:${projectId}:${collectionId}:empty`,
+            },
+            this.extensionUri,
+          ),
+        ];
+      }
+
+      return attributes.map(
+        (attr: any) =>
+          new AppForgeTreeItem(
+            `${attr.key} (${attr.type})${attr.required ? " *" : ""}`,
+            vscode.TreeItemCollapsibleState.None,
+            {
+              type: "attribute",
+              label: attr.key,
+              id: attr.key,
+              projectId,
+              collectionId,
+              treeId: `attribute:${projectId}:${collectionId}:${attr.key}`,
+            },
+            this.extensionUri,
+          ),
+      );
+    } catch (error) {
+      outputChannel.error(
+        "[TREE]",
+        "Error fetching attributes",
+        error as Error,
+      );
+      return [];
+    }
+  }
+
+  private async getIndexesChildren(
+    element: AppForgeTreeItem,
+  ): Promise<AppForgeTreeItem[]> {
+    const projectId = element.data.projectId;
+    const collectionId = element.data.collectionId;
+    const databaseId = element.data.databaseId;
+
+    if (!projectId || !collectionId || !databaseId) {
+      return [];
+    }
+
+    try {
+      const project = this.projectStorage.getProjectById(projectId);
+      if (!project) return [];
+
+      const apiKey = await this.projectStorage.getApiKey(projectId);
+      if (!apiKey) return [];
+
+      const { DatabaseService } =
+        await import("../services/databaseService.js");
+      const dbService = new DatabaseService(project, apiKey);
+      const { indexes } = await dbService.getCollectionDetails(
+        databaseId,
+        collectionId,
+      );
+
+      if (indexes.length === 0) {
+        return [
+          new AppForgeTreeItem(
+            "No indexes",
+            vscode.TreeItemCollapsibleState.None,
+            {
+              type: "index",
+              label: "No indexes",
+              projectId,
+              collectionId,
+              treeId: `index:${projectId}:${collectionId}:empty`,
+            },
+            this.extensionUri,
+          ),
+        ];
+      }
+
+      return indexes.map(
+        (idx: any) =>
+          new AppForgeTreeItem(
+            `${idx.key} (${idx.type})`,
+            vscode.TreeItemCollapsibleState.None,
+            {
+              type: "index",
+              label: idx.key,
+              id: idx.key,
+              projectId,
+              collectionId,
+              treeId: `index:${projectId}:${collectionId}:${idx.key}`,
+            },
+            this.extensionUri,
+          ),
+      );
+    } catch (error) {
+      outputChannel.error("[TREE]", "Error fetching indexes", error as Error);
+      return [];
+    }
+  }
+
+  private async getDocumentsChildren(
+    element: AppForgeTreeItem,
+  ): Promise<AppForgeTreeItem[]> {
+    const projectId = element.data.projectId;
+    const collectionId = element.data.collectionId;
+    const databaseId = element.data.databaseId;
+
+    if (!projectId || !collectionId || !databaseId) {
+      return [];
+    }
+
+    try {
+      const project = this.projectStorage.getProjectById(projectId);
+      if (!project) return [];
+
+      const apiKey = await this.projectStorage.getApiKey(projectId);
+      if (!apiKey) return [];
+
+      const { DatabaseService } =
+        await import("../services/databaseService.js");
+      const dbService = new DatabaseService(project, apiKey);
+      const documents = await dbService.listDocuments(databaseId, collectionId);
+
+      if (documents.length === 0) {
+        return [
+          new AppForgeTreeItem(
+            "No documents",
+            vscode.TreeItemCollapsibleState.None,
+            {
+              type: "document",
+              label: "No documents",
+              projectId,
+              collectionId,
+              treeId: `document:${projectId}:${collectionId}:empty`,
+            },
+            this.extensionUri,
+          ),
+        ];
+      }
+
+      return documents.slice(0, 100).map(
+        (doc: any) =>
+          new AppForgeTreeItem(
+            `📄 ${doc.$id.substring(0, 8)}...`,
+            vscode.TreeItemCollapsibleState.None,
+            {
+              type: "document",
+              label: doc.$id,
+              id: doc.$id,
+              projectId,
+              collectionId,
+              treeId: `document:${projectId}:${collectionId}:${doc.$id}`,
+            },
+            this.extensionUri,
+          ),
+      );
+    } catch (error) {
+      outputChannel.error("[TREE]", "Error fetching documents", error as Error);
+      return [];
+    }
+  }
+
+  private async getFunctionDetailsChildren(
+    element: AppForgeTreeItem,
+  ): Promise<AppForgeTreeItem[]> {
+    const children: AppForgeTreeItem[] = [];
+    const projectId = element.data.projectId;
+    const functionId = element.data.id;
+
+    // Deployments
+    const deploymentsData: TreeItemData = {
+      type: "deployments",
+      label: "Deployments",
+      projectId,
+      functionId,
+      treeId: `deployments:${projectId}:${functionId}`,
+    };
+    children.push(
+      new AppForgeTreeItem(
+        "🚀 Deployments",
+        this.isExpanded(`deployments:${projectId}:${functionId}`)
+          ? vscode.TreeItemCollapsibleState.Expanded
+          : vscode.TreeItemCollapsibleState.Collapsed,
+        deploymentsData,
+        this.extensionUri,
+      ),
+    );
+
+    // Executions
+    const executionsData: TreeItemData = {
+      type: "executions",
+      label: "Executions",
+      projectId,
+      functionId,
+      treeId: `executions:${projectId}:${functionId}`,
+    };
+    children.push(
+      new AppForgeTreeItem(
+        "⚡ Executions",
+        this.isExpanded(`executions:${projectId}:${functionId}`)
+          ? vscode.TreeItemCollapsibleState.Expanded
+          : vscode.TreeItemCollapsibleState.Collapsed,
+        executionsData,
+        this.extensionUri,
+      ),
+    );
+
+    // Variables
+    const variablesData: TreeItemData = {
+      type: "variables",
+      label: "Variables",
+      projectId,
+      functionId,
+      treeId: `variables:${projectId}:${functionId}`,
+    };
+    children.push(
+      new AppForgeTreeItem(
+        "🔒 Variables",
+        this.isExpanded(`variables:${projectId}:${functionId}`)
+          ? vscode.TreeItemCollapsibleState.Expanded
+          : vscode.TreeItemCollapsibleState.Collapsed,
+        variablesData,
+        this.extensionUri,
+      ),
+    );
+
+    return children;
+  }
+
+  private async getDeploymentsChildren(
+    element: AppForgeTreeItem,
+  ): Promise<AppForgeTreeItem[]> {
+    const projectId = element.data.projectId;
+    const functionId = element.data.functionId;
+
+    if (!projectId || !functionId) {
+      return [];
+    }
+
+    try {
+      const project = this.projectStorage.getProjectById(projectId);
+      if (!project) return [];
+
+      const apiKey = await this.projectStorage.getApiKey(projectId);
+      if (!apiKey) return [];
+
+      const { FunctionsService } =
+        await import("../services/functionsService.js");
+      const fnService = new FunctionsService(project, apiKey);
+      const deployments = await fnService.listDeployments(functionId);
+
+      if (deployments.length === 0) {
+        return [
+          new AppForgeTreeItem(
+            "No deployments",
+            vscode.TreeItemCollapsibleState.None,
+            {
+              type: "deployment",
+              label: "No deployments",
+              projectId,
+              functionId,
+              treeId: `deployment:${projectId}:${functionId}:empty`,
+            },
+            this.extensionUri,
+          ),
+        ];
+      }
+
+      return deployments.map(
+        (dep: any) =>
+          new AppForgeTreeItem(
+            `🚀 ${dep.status} (${dep.$id.substring(0, 8)}...)`,
+            vscode.TreeItemCollapsibleState.None,
+            {
+              type: "deployment",
+              label: dep.$id,
+              id: dep.$id,
+              projectId,
+              functionId,
+              treeId: `deployment:${projectId}:${functionId}:${dep.$id}`,
+            },
+            this.extensionUri,
+          ),
+      );
+    } catch (error) {
+      outputChannel.error(
+        "[TREE]",
+        "Error fetching deployments",
+        error as Error,
+      );
+      return [];
+    }
+  }
+
+  private async getExecutionsChildren(
+    element: AppForgeTreeItem,
+  ): Promise<AppForgeTreeItem[]> {
+    const projectId = element.data.projectId;
+    const functionId = element.data.functionId;
+
+    if (!projectId || !functionId) {
+      return [];
+    }
+
+    try {
+      const project = this.projectStorage.getProjectById(projectId);
+      if (!project) return [];
+
+      const apiKey = await this.projectStorage.getApiKey(projectId);
+      if (!apiKey) return [];
+
+      const { FunctionsService } =
+        await import("../services/functionsService.js");
+      const fnService = new FunctionsService(project, apiKey);
+      const executions = await fnService.listExecutions(functionId);
+
+      if (executions.length === 0) {
+        return [
+          new AppForgeTreeItem(
+            "No executions",
+            vscode.TreeItemCollapsibleState.None,
+            {
+              type: "execution",
+              label: "No executions",
+              projectId,
+              functionId,
+              treeId: `execution:${projectId}:${functionId}:empty`,
+            },
+            this.extensionUri,
+          ),
+        ];
+      }
+
+      return executions.slice(0, 50).map(
+        (exec) =>
+          new AppForgeTreeItem(
+            `⚡ ${exec.status} (${exec.duration}ms)`,
+            vscode.TreeItemCollapsibleState.None,
+            {
+              type: "execution",
+              label: exec.$id,
+              id: exec.$id,
+              projectId,
+              functionId,
+              treeId: `execution:${projectId}:${functionId}:${exec.$id}`,
+            },
+            this.extensionUri,
+          ),
+      );
+    } catch (error) {
+      outputChannel.error(
+        "[TREE]",
+        "Error fetching executions",
+        error as Error,
+      );
+      return [];
+    }
+  }
+
+  private async getVariablesChildren(
+    element: AppForgeTreeItem,
+  ): Promise<AppForgeTreeItem[]> {
+    const projectId = element.data.projectId;
+    const functionId = element.data.functionId;
+
+    if (!projectId || !functionId) {
+      return [];
+    }
+
+    try {
+      const project = this.projectStorage.getProjectById(projectId);
+      if (!project) return [];
+
+      const apiKey = await this.projectStorage.getApiKey(projectId);
+      if (!apiKey) return [];
+
+      const { FunctionsService } =
+        await import("../services/functionsService.js");
+      const fnService = new FunctionsService(project, apiKey);
+      const variables = await fnService.listVariables(functionId);
+
+      if (variables.length === 0) {
+        return [
+          new AppForgeTreeItem(
+            "No variables",
+            vscode.TreeItemCollapsibleState.None,
+            {
+              type: "variable",
+              label: "No variables",
+              projectId,
+              functionId,
+              treeId: `variable:${projectId}:${functionId}:empty`,
+            },
+            this.extensionUri,
+          ),
+        ];
+      }
+
+      return variables.map(
+        (variable: any) =>
+          new AppForgeTreeItem(
+            `🔒 ${variable.key}`,
+            vscode.TreeItemCollapsibleState.None,
+            {
+              type: "variable",
+              label: variable.key,
+              id: variable.key,
+              projectId,
+              functionId,
+              treeId: `variable:${projectId}:${functionId}:${variable.key}`,
+            },
+            this.extensionUri,
+          ),
+      );
+    } catch (error) {
+      outputChannel.error("[TREE]", "Error fetching variables", error as Error);
+      return [];
+    }
+  }
+
+  private async getBucketsChildren(
+    element: AppForgeTreeItem,
+  ): Promise<AppForgeTreeItem[]> {
+    const projectId = element.data.projectId;
+
+    if (!projectId) {
+      return [];
+    }
+
+    try {
+      const project = this.projectStorage.getProjectById(projectId);
+      if (!project) return [];
+
+      const apiKey = await this.projectStorage.getApiKey(projectId);
+      if (!apiKey) return [];
+
+      const { StorageService } = await import("../services/storageService.js");
+      const storageService = new StorageService(project, apiKey);
+      const buckets = await storageService.listBuckets();
+
+      if (buckets.length === 0) {
+        return [
+          new AppForgeTreeItem(
+            "No buckets",
+            vscode.TreeItemCollapsibleState.None,
+            {
+              type: "bucket",
+              label: "No buckets",
+              projectId,
+              treeId: `bucket:${projectId}:empty`,
+            },
+            this.extensionUri,
+          ),
+        ];
+      }
+
+      return buckets.map(
+        (bucket: any) =>
+          new AppForgeTreeItem(
+            `📁 ${bucket.name} (${bucket.filesCount} files)`,
+            this.isExpanded(`bucket:${projectId}:${bucket.$id}`)
+              ? vscode.TreeItemCollapsibleState.Expanded
+              : vscode.TreeItemCollapsibleState.Collapsed,
+            {
+              type: "bucket",
+              label: bucket.name,
+              id: bucket.$id,
+              projectId,
+              bucketId: bucket.$id,
+              treeId: `bucket:${projectId}:${bucket.$id}`,
+            },
+            this.extensionUri,
+          ),
+      );
+    } catch (error) {
+      outputChannel.error("[TREE]", "Error fetching buckets", error as Error);
+      return [];
+    }
+  }
+
+  private async getFilesChildren(
+    element: AppForgeTreeItem,
+  ): Promise<AppForgeTreeItem[]> {
+    const projectId = element.data.projectId;
+    const bucketId = element.data.bucketId || element.data.id;
+
+    if (!projectId || !bucketId) {
+      return [];
+    }
+
+    try {
+      const project = this.projectStorage.getProjectById(projectId);
+      if (!project) return [];
+
+      const apiKey = await this.projectStorage.getApiKey(projectId);
+      if (!apiKey) return [];
+
+      const { StorageService } = await import("../services/storageService.js");
+      const storageService = new StorageService(project, apiKey);
+      const files = await storageService.listFiles(bucketId);
+
+      if (files.length === 0) {
+        return [
+          new AppForgeTreeItem(
+            "No files",
+            vscode.TreeItemCollapsibleState.None,
+            {
+              type: "file",
+              label: "No files",
+              projectId,
+              bucketId,
+              treeId: `file:${projectId}:${bucketId}:empty`,
+            },
+            this.extensionUri,
+          ),
+        ];
+      }
+
+      return files.map(
+        (file: any) =>
+          new AppForgeTreeItem(
+            `📄 ${file.name} (${(file.size / 1024).toFixed(2)} KB)`,
+            vscode.TreeItemCollapsibleState.None,
+            {
+              type: "file",
+              label: file.name,
+              id: file.$id,
+              projectId,
+              bucketId,
+              treeId: `file:${projectId}:${bucketId}:${file.$id}`,
+            },
+            this.extensionUri,
+          ),
+      );
+    } catch (error) {
+      outputChannel.error("[TREE]", "Error fetching files", error as Error);
       return [];
     }
   }

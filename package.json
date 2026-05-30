@@ -2,7 +2,7 @@
   "name": "appforge",
   "displayName": "AppForge",
   "description": "AppForge is an Appwrite-native developer cockpit inside VS Code. Manage projects, databases, functions, and logs without leaving your editor.",
-  "version": "0.1.1-alpha",
+  "version": "0.2.0-alpha",
   "publisher": "ArhanAnsari",
   "author": "Arhan Ansari",
   "license": "MIT",
@@ -155,6 +155,66 @@
         "title": "AppForge: View Database",
         "category": "AppForge",
         "icon": "$(database)"
+      },
+      {
+        "command": "appforge.createCollection",
+        "title": "AppForge: Create Collection",
+        "category": "AppForge",
+        "icon": "$(add)"
+      },
+      {
+        "command": "appforge.createBucket",
+        "title": "AppForge: Create Bucket",
+        "category": "AppForge",
+        "icon": "$(add)"
+      },
+      {
+        "command": "appforge.uploadFile",
+        "title": "AppForge: Upload File",
+        "category": "AppForge",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "appforge.downloadFile",
+        "title": "AppForge: Download File",
+        "category": "AppForge",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "appforge.deleteFile",
+        "title": "AppForge: Delete File",
+        "category": "AppForge",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "appforge.refreshResources",
+        "title": "AppForge: Refresh Resources",
+        "category": "AppForge",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "appforge.openAppwriteConsole",
+        "title": "AppForge: Open Appwrite Console",
+        "category": "AppForge",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "appforge.viewLogs",
+        "title": "AppForge: View Logs",
+        "category": "AppForge",
+        "icon": "$(output)"
+      },
+      {
+        "command": "appforge.viewFunctionLogs",
+        "title": "AppForge: View Function Logs",
+        "category": "AppForge",
+        "icon": "$(output)"
+      },
+      {
+        "command": "appforge.runDiagnostics",
+        "title": "AppForge: Run Diagnostics",
+        "category": "AppForge",
+        "icon": "$(debug)"
       }
     ],
     "menus": {
@@ -184,6 +244,18 @@
         },
         {
           "command": "appforge.refreshDatabases",
+          "when": "viewItem == project",
+          "group": "1_modification",
+          "icon": "$(refresh)"
+        },
+        {
+          "command": "appforge.openAppwriteConsole",
+          "when": "viewItem == project",
+          "group": "1_modification",
+          "icon": "$(link-external)"
+        },
+        {
+          "command": "appforge.refreshDatabases",
           "when": "viewItem == databases",
           "group": "1_modification",
           "icon": "$(refresh)"
@@ -199,8 +271,79 @@
           "group": "1_modification"
         },
         {
+          "command": "appforge.refreshResources",
+          "when": "viewItem == database",
+          "group": "1_modification",
+          "icon": "$(refresh)"
+        },
+        {
           "command": "appforge.viewDatabase",
           "when": "viewItem == collection",
+          "group": "1_modification"
+        },
+        {
+          "command": "appforge.createCollection",
+          "when": "viewItem == database",
+          "group": "1_modification"
+        },
+        {
+          "command": "appforge.refreshResources",
+          "when": "viewItem == collection",
+          "group": "1_modification",
+          "icon": "$(refresh)"
+        },
+        {
+          "command": "appforge.executeFunction",
+          "when": "viewItem == function",
+          "group": "1_modification"
+        },
+        {
+          "command": "appforge.viewFunctionLogs",
+          "when": "viewItem == function",
+          "group": "1_modification",
+          "icon": "$(output)"
+        },
+        {
+          "command": "appforge.refreshResources",
+          "when": "viewItem == function",
+          "group": "1_modification",
+          "icon": "$(refresh)"
+        },
+        {
+          "command": "appforge.createBucket",
+          "when": "viewItem == buckets",
+          "group": "1_modification"
+        },
+        {
+          "command": "appforge.refreshResources",
+          "when": "viewItem == buckets",
+          "group": "1_modification",
+          "icon": "$(refresh)"
+        },
+        {
+          "command": "appforge.uploadFile",
+          "when": "viewItem == bucket",
+          "group": "1_modification"
+        },
+        {
+          "command": "appforge.refreshResources",
+          "when": "viewItem == bucket",
+          "group": "1_modification",
+          "icon": "$(refresh)"
+        },
+        {
+          "command": "appforge.downloadFile",
+          "when": "viewItem == file",
+          "group": "1_modification"
+        },
+        {
+          "command": "appforge.deleteFile",
+          "when": "viewItem == file",
+          "group": "1_modification"
+        },
+        {
+          "command": "appforge.viewLogs",
+          "when": "viewItem == logs",
           "group": "1_modification"
         }
       ]
