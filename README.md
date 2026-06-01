@@ -2,7 +2,7 @@
 
 Appwrite-native developer tooling inside VS Code.
 
-[![Version](https://img.shields.io/badge/version-0.1.1--alpha-0ea5e9)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.2.0--alpha-0ea5e9)](./CHANGELOG.md)
 [![Alpha](https://img.shields.io/badge/status-alpha-f59e0b)](./CHANGELOG.md)
 [![VS Code](https://img.shields.io/badge/VS%20Code-extension-007acc)](https://code.visualstudio.com/api)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)](./tsconfig.json)
@@ -31,27 +31,67 @@ It solves the problems that usually show up in real Appwrite workflows:
 - Add, remove, and switch projects from the sidebar or command palette
 - Keep project metadata isolated by project ID
 - Auto-load the active project on extension activation
+- Status bar indicator for quick project identification
+
+### Database Explorer
+
+- Hierarchical tree view of databases, collections, and documents
+- Lazy-load documents for responsive navigation (first 100 documents)
+- Inspect collection attributes with field types
+- View indexes and their configurations
+- Create, update, and delete documents directly
+- Collection schema browser with attribute details
+
+### Functions Explorer
+
+- Browse all functions per project
+- View deployment metadata and configurations
+- Inspect function variables and settings
+- Execute functions directly from the sidebar
+- Deploy new function versions without leaving VS Code
+- Execution history and status tracking
+
+### Storage Explorer
+
+- Browse buckets and file contents per project
+- View bucket permissions and metadata
+- Inspect file details and sizes
+- Upload and delete files from the UI
+- File management through context menus
+- Bucket-level access control inspection
 
 ### TreeView Resource Explorer
 
-- Browse projects, databases, collections, functions, and logs from the Activity Bar
+- Unified sidebar explorer for all Appwrite resources
 - Expand resources lazily for responsive navigation
 - Preserve expansion state across refreshes
-- Use context menus for quick project actions
+- Use context menus for quick actions on all resource types
+- Color-coded tree items for resource types
+
+### Logs Viewer
+
+- Centralized WebView panel for operation logs
+- Raw REST and SDK response inspection
+- Structured logging with success/warning/error/debug levels
+- Timing information for async operations
+- Diagnostic traces for troubleshooting
+- Export logs for support workflows
 
 ### Appwrite Integration
 
 - Connect to Appwrite Cloud or self-hosted Appwrite instances
 - Use Appwrite API keys for backend operations
 - Validate connections before saving a project
-- Run database and function workflows from within VS Code
+- Run database, function, and storage workflows from within VS Code
+- Support for multiple Appwrite versions
 
 ### Project Switching
 
-- Switch context instantly from the sidebar
+- Switch context instantly from the sidebar or status bar
 - Avoid manual reconfiguration when moving between environments
 - Keep each project node independent and deterministic
 - Reduce stale state during fast project changes
+- Status bar shows active project name
 
 ### Diagnostics System
 
@@ -59,6 +99,7 @@ It solves the problems that usually show up in real Appwrite workflows:
 - Compare SDK responses with raw REST responses
 - Troubleshoot empty database results with dedicated tooling
 - Verify project and endpoint identity before chasing UI bugs
+- Comprehensive runtime logging with console traces
 
 ### Logging System
 
@@ -66,6 +107,7 @@ It solves the problems that usually show up in real Appwrite workflows:
 - Success, warning, error, and debug events
 - Timing-aware logging for async operations
 - Diagnostics output designed for real support workflows
+- Diagnostic traces for proof of execution: `[TREE]`, `[DATABASES]`, `[STATUSBAR]`, etc.
 
 ### Developer-Focused UX
 
@@ -89,6 +131,9 @@ It solves the problems that usually show up in real Appwrite workflows:
 - `AppForge: Switch Project`
 - `AppForge: Refresh Projects`
 - `AppForge: Refresh Databases`
+- `AppForge: Refresh Functions`
+- `AppForge: Refresh Storage`
+- `AppForge: Create Collection`
 - `AppForge: Create Document`
 - `AppForge: Delete Document`
 - `AppForge: List Documents`
@@ -96,29 +141,78 @@ It solves the problems that usually show up in real Appwrite workflows:
 - `AppForge: Execute Function`
 - `AppForge: Deploy Function`
 - `AppForge: View Logs`
+- `AppForge: View Function Logs`
 - `AppForge: Check Project Status`
 - `AppForge: View Connection Info`
 - `AppForge: Troubleshoot Empty Databases`
 - `AppForge: Verify Appwrite Project Environment`
+- `AppForge: Run Diagnostics`
 
-## ✨ What's New in v0.1.1-alpha
+## ✨ What's New in v0.2.0-alpha
 
-v0.1.1-alpha is a reliability and architecture hardening release.
+v0.2.0-alpha introduces comprehensive resource explorers for Databases, Functions, and Storage, plus improved diagnostic tooling.
 
-- Stable TreeItem identity system for consistent TreeView reconciliation
-- Fixed mixed-resource rendering and expansion behavior
-- Deterministic refresh behavior with less UI drift
-- Project-scoped Appwrite client architecture
-- Cross-project isolation by design
-- No shared mutable client state across async operations
-- Better handling during rapid project switching
-- Database fetch diagnostics with stored metadata logging
-- Raw REST + SDK verification tooling
-- More transparent endpoint, project ID, and API key context
-- Reduced stale-state risk in database and function flows
-- Stronger debugging infrastructure for multi-project support
+### Database Explorer
 
-This release intentionally moves away from unsafe shared mutable client state and toward explicit project-scoped service creation for every Appwrite operation.
+- View all databases and collections in a hierarchical tree
+- Browse collection attributes, indexes, and documents
+- Lazy-load documents (first 100) for responsive navigation
+- Inspect document structure and field types
+- Create, delete, and update documents directly from the explorer
+- Collection schema with attribute types and index details
+- Right-click context menus for common operations
+
+### Functions Explorer
+
+- Browse all functions and their deployments per project
+- View deployment metadata and execution history
+- Display function variables and configuration
+- Execute functions directly from the sidebar
+- Deploy new function versions without leaving VS Code
+- Monitor function status and metadata
+
+### Storage Explorer
+
+- Browse buckets and their contents
+- View bucket permissions and configuration
+- Inspect file metadata and sizes
+- Upload and delete files from the UI
+- File management operations from context menus
+- Bucket-level access controls
+
+### Logs Viewer
+
+- Centralized logging panel for operation traces
+- View raw REST and SDK responses
+- Structured logging with success/warning/error levels
+- Timing information for async operations
+- Diagnostic tooling for database verification
+- Export logs for support workflows
+
+### Status Bar Enhancement
+
+- Active project indicator in VS Code status bar
+- LEFT alignment with priority 1000 for visibility
+- Quick project switching from the status bar
+- Real-time project name display
+- Click-to-switch project workflow
+
+### Improved Diagnostics
+
+- Comprehensive project metadata inspection
+- Raw REST vs SDK response comparison
+- Endpoint and project ID verification
+- Runtime logging with diagnostic traces
+- Proof of execution through console logs
+- API call tracing for database operations
+
+**Experimental Features**:
+
+- Logs Viewer is a preview feature with roadmap updates in v0.2.1-alpha
+- Function deployment via drag-and-drop (upcoming)
+- Real-time document change notifications (upcoming)
+
+This release focuses on making Appwrite resources fully visible and queryable from VS Code, with transparent logging to build confidence in multi-project workflows.
 
 ## Architecture
 
@@ -234,16 +328,35 @@ src/
 
 ## Roadmap
 
-AppForge is intentionally scoped, but the roadmap is aimed at making it a complete Appwrite operations surface inside VS Code.
+AppForge v0.2.0-alpha completes the core resource exploration surface for Databases, Functions, and Storage. The roadmap beyond v0.2.0 is focused on operational confidence and multi-project automation.
 
-- Functions explorer with execution history
-- Storage bucket explorer and file management
-- Auth management tooling
-- Deployment workflows for functions and resources
-- Realtime monitoring for logs and backend events
+### v0.2.1-alpha (Stabilization & Logs)
+
+- Logs Viewer feature completion with filtering and export
+- Function execution logs viewer
+- Improved error messages for common failure modes
+- Performance optimization for large databases and function counts
+- API response caching for frequently-accessed resources
+
+### v0.3.0-alpha (Operations & Automation)
+
+- Search and filter across databases, functions, and storage
+- Bulk operations: delete multiple documents, manage permissions
+- Resource tagging and favorite management
+- Git-aware function deployment (deploy from current branch)
+- Environment variable management per project
+- Function execution scheduling and monitoring
+
+### Future Roadmap
+
+- Auth management and user administration
+- Real-time monitoring for logs and backend events
 - AI-assisted developer tooling and smart diagnostics
 - Appwrite Cloud region and environment diagnostics
 - Direct resource editing for supported Appwrite entities
+- Deployment workflows for functions, databases, and schemas
+- Team collaboration features for shared workspaces
+- Custom resource templates and scaffolding
 
 ## Contributing
 
@@ -262,17 +375,39 @@ If you are proposing a larger workflow or architecture change, include the reaso
 
 ## Documentation
 
-- Alpha architecture notes: [docs/v0.1.1-alpha.md](./docs/v0.1.1-alpha.md)
-- Release history: [CHANGELOG.md](./CHANGELOG.md)
+- Release notes: [CHANGELOG.md](./CHANGELOG.md)
+- v0.2.0-alpha release report: [RELEASE_REPORT_v0.2.0-alpha.md](./RELEASE_REPORT_v0.2.0-alpha.md)
 - Folder layout reference: [FOLDER_STRUCTURE.md](./FOLDER_STRUCTURE.md)
 
 ## Troubleshooting
 
+### Activation & Setup
+
 - Extension does not activate: confirm VS Code `^1.120.0` or newer and reload the window.
-- Projects do not appear: verify the workspace contains saved AppForge project state.
+- Projects do not appear in sidebar: verify the workspace contains saved AppForge project state.
+
+### Projects & Connection
+
 - Connection test fails: check the endpoint, project ID, and API key.
-- Databases appear empty: run `AppForge: Verify Appwrite Project Environment` and compare the raw REST output with the Appwrite console.
 - Project switching looks inconsistent: confirm the project ID in the sidebar matches the project ID stored in AppForge.
+- Status bar does not show project name: enable LEFT alignment in status bar settings and check the Output Channel for diagnostics.
+
+### Resource Exploration
+
+- Database explorer is empty: run `AppForge: Verify Appwrite Project Environment` and compare the raw REST output with the Appwrite console.
+- Collections do not load: check that the selected database is accessible with the stored API key.
+- Documents appear truncated: document list is limited to first 100 for performance; use the Appwrite console for full browsing.
+
+### Functions & Storage
+
+- Functions explorer shows no deployments: verify the function is deployed via the Appwrite console first.
+- Storage buckets are not visible: check bucket permissions and that files are accessible with the current API key.
+
+### Diagnostics & Logging
+
+- No logs appear in the Logs Viewer: check the Output Channel (`View → Output → AppForge`) for raw extension output.
+- Diagnostic traces missing: enable debug logging in VS Code settings (`"appforge.logLevel": "debug"`).
+- API call traces not appearing: run `AppForge: Run Diagnostics` and check the Output Channel for `[TREE]`, `[DATABASES]`, and `[STATUSBAR]` trace logs.
 
 ## Requirements
 

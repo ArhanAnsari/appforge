@@ -600,18 +600,24 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
   ): Promise<AppForgeTreeItem[]> {
     try {
       const projectId = element.data.projectId;
+      outputChannel.debug("[TREE]", "getDatabasesChildren() called", {
+        projectId,
+      });
+
       if (!projectId) {
+        outputChannel.error("[TREE]", "No projectId provided");
         return [];
       }
 
       const project = this.projectStorage.getProjectById(projectId);
       if (!project) {
+        outputChannel.error("[TREE]", "Project not found", { projectId });
         return [];
       }
 
       const apiKey = await this.projectStorage.getApiKey(projectId);
       if (!apiKey) {
-        outputChannel.error("DATABASES", "Missing API key for project", {
+        outputChannel.error("[TREE]", "Missing API key for project", {
           projectId,
         });
         return [
@@ -641,6 +647,12 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
 
       // Now fetch databases (with robust diagnostics and timeout)
       try {
+        console.log("[TREE] Expanding databases node", {
+          projectId,
+          endpoint: project.endpoint,
+        });
+        console.log("[DATABASES] Fetching databases", { projectId });
+
         outputChannel.debug("DATABASES", "Fetch starting", {
           requestedProjectId: projectId,
           activeProjectId: this.projectStorage.getActiveProjectId(),
@@ -669,6 +681,9 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
         logger.info("TREE", "=== END PROJECT CONTEXT ===", null);
 
         logger.info("TREE", "Starting API call to list databases...", null);
+        console.log("[DATABASES] API call starting", {
+          endpoint: project.endpoint,
+        });
 
         try {
           const rawRes = await fetch(`${project.endpoint}/databases`, {
@@ -721,71 +736,23 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
             ),
           ]);
         } catch (fetchError) {
+          console.error("[DATABASES] API call failed", fetchError);
           outputChannel.error("DATABASES", "Fetch failed", fetchError as Error);
           throw fetchError;
         }
 
         logger.success("TREE", "API call completed successfully", null);
 
-        // Log full response for debugging - handle circular refs
-        logger.info("TREE", "=== RAW API RESPONSE ===", null);
-        logger.info("TREE", "Response type", typeof response);
-        logger.info(
-          "TREE",
-          "Response instanceof Object",
-          response instanceof Object,
-        );
-        logger.info(
-          "TREE",
-          "Response keys",
-          response && typeof response === "object"
-            ? Object.keys(response)
-            : "N/A",
-        );
-        logger.info("TREE", "Response.total", (response as any)?.total);
-        logger.info(
-          "TREE",
-          "Response.databases length",
-          (response as any)?.databases?.length,
-        );
-
-        // Safely stringify with replacer to avoid circular refs
-        try {
-          const seen = new WeakSet();
-          const jsonStr = JSON.stringify(
-            response,
-            (key, value) => {
-              if (typeof value === "object" && value !== null) {
-                if (seen.has(value)) {
-                  return "[Circular]";
-                }
-                seen.add(value);
-              }
-              return value;
-            },
-            2,
-          );
-          logger.info("TREE", "Response JSON", jsonStr);
-        } catch (stringifyError) {
-          logger.error("TREE", "Failed to stringify response", stringifyError);
-          logger.info("TREE", "Response toString", response?.toString());
-        }
-
-        logger.info("TREE", "=== END RAW RESPONSE ===", null);
-
-        outputChannel.debug("DATABASES", "Raw response", {
-          projectId,
-          total: response?.total,
-          databases: response?.databases?.map((db: any) => ({
-            id: db.$id,
-            name: db.name,
-          })),
-        });
-
         const databases = extractObjectArrayWithId(response);
-        logger.debug("TREE", "Extracted databases array", {
-          length: databases.length,
-          sample: databases.slice(0, 3),
+        console.log("[DATABASES] API call success", {
+          responseType: typeof response,
+          hasTotal: !!response?.total,
+          hasDatabases: !!response?.databases,
+          databaseCount: databases.length,
+        });
+        console.log("[DATABASES] Found X databases", {
+          projectId,
+          count: databases.length,
         });
 
         const children: AppForgeTreeItem[] = [];
@@ -1648,15 +1615,34 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
     }
 
     try {
+      console.log("[TREE] Expanding storage node", { projectId });
+      console.log("[STORAGE] Fetching buckets", { projectId });
+
       const project = this.projectStorage.getProjectById(projectId);
-      if (!project) return [];
+      if (!project) {
+        console.error("[STORAGE] Project not found", { projectId });
+        return [];
+      }
 
       const apiKey = await this.projectStorage.getApiKey(projectId);
-      if (!apiKey) return [];
+      if (!apiKey) {
+        console.error("[STORAGE] API key not found", { projectId });
+        return [];
+      }
+
+      console.log("[STORAGE] API call starting", {
+        endpoint: project.endpoint,
+      });
 
       const { StorageService } = await import("../services/storageService.js");
       const storageService = new StorageService(project, apiKey);
       const buckets = await storageService.listBuckets();
+
+      console.log("[STORAGE] API call success", { count: buckets.length });
+      console.log("[STORAGE] Found X buckets", {
+        projectId,
+        count: buckets.length,
+      });
 
       if (buckets.length === 0) {
         return [
@@ -1709,15 +1695,35 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
     }
 
     try {
+      console.log("[TREE] Expanding files node", { projectId, bucketId });
+      console.log("[STORAGE] Fetching files", { projectId, bucketId });
+
       const project = this.projectStorage.getProjectById(projectId);
-      if (!project) return [];
+      if (!project) {
+        console.error("[STORAGE] Project not found", { projectId });
+        return [];
+      }
 
       const apiKey = await this.projectStorage.getApiKey(projectId);
-      if (!apiKey) return [];
+      if (!apiKey) {
+        console.error("[STORAGE] API key not found", { projectId });
+        return [];
+      }
+
+      console.log("[STORAGE] API call starting", {
+        endpoint: project.endpoint,
+      });
 
       const { StorageService } = await import("../services/storageService.js");
       const storageService = new StorageService(project, apiKey);
       const files = await storageService.listFiles(bucketId);
+
+      console.log("[STORAGE] API call success", { count: files.length });
+      console.log("[STORAGE] Found X files", {
+        projectId,
+        bucketId,
+        count: files.length,
+      });
 
       if (files.length === 0) {
         return [
