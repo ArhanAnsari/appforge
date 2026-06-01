@@ -29,6 +29,9 @@ import { outputChannel } from "./core/output/outputChannel";
  * Activate the extension
  */
 export function activate(context: vscode.ExtensionContext) {
+  vscode.window.showInformationMessage(
+    "AppForge Activated"
+  );
   logger.initialize();
   logger.success(
     "EXTENSION",
@@ -48,6 +51,10 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Show the status bar
     statusBar.show();
+
+    vscode.window.showInformationMessage(
+      "Status bar initialized"
+    );
 
     // Initialize tree data provider for sidebar
     const treeDataProvider = new AppForgeTreeDataProvider(
