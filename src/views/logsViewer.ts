@@ -322,14 +322,14 @@ function getLogsViewerHtml(projectName: string): string {
   <script>
     const vscode = acquireVsCodeApi();
     
-    function showTab(tabName) {
+    function showTab(evt, tabName) {
       const tabs = document.querySelectorAll('.tab');
       const contents = document.querySelectorAll('.tab-content');
       
       tabs.forEach(tab => tab.classList.remove('active'));
       contents.forEach(content => content.classList.remove('active'));
       
-      event.target.classList.add('active');
+      evt.target.classList.add('active');
       document.getElementById(tabName).classList.add('active');
     }
     
