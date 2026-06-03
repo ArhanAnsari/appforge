@@ -30,6 +30,8 @@ export class StorageService {
       return buckets.map((bucket: any) => ({
         $id: bucket.$id,
         name: bucket.name,
+        // Appwrite returns a file count field depending on version; keep a safe fallback.
+        filesCount: bucket.filesCount ?? bucket.filesTotal ?? bucket.files ?? 0,
         enabled: bucket.enabled,
       }));
     } catch (error) {
