@@ -46,17 +46,17 @@ export class AppForgeTreeItem extends vscode.TreeItem {
       case "collection":
         return `collection:${data.projectId ?? ""}:${data.databaseId ?? ""}:${data.id ?? data.label}`;
       case "attributes":
-        return `attributes:${data.projectId ?? ""}:${data.collectionId ?? ""}`;
+        return `attributes:${data.projectId ?? ""}:${data.databaseId ?? ""}:${data.collectionId ?? ""}`;
       case "attribute":
-        return `attribute:${data.projectId ?? ""}:${data.collectionId ?? ""}:${data.id ?? data.label}`;
+        return `attribute:${data.projectId ?? ""}:${data.databaseId ?? ""}:${data.collectionId ?? ""}:${data.id ?? data.label}`;
       case "indexes":
-        return `indexes:${data.projectId ?? ""}:${data.collectionId ?? ""}`;
+        return `indexes:${data.projectId ?? ""}:${data.databaseId ?? ""}:${data.collectionId ?? ""}`;
       case "index":
-        return `index:${data.projectId ?? ""}:${data.collectionId ?? ""}:${data.id ?? data.label}`;
+        return `index:${data.projectId ?? ""}:${data.databaseId ?? ""}:${data.collectionId ?? ""}:${data.id ?? data.label}`;
       case "documents":
-        return `documents:${data.projectId ?? ""}:${data.collectionId ?? ""}`;
+        return `documents:${data.projectId ?? ""}:${data.databaseId ?? ""}:${data.collectionId ?? ""}`;
       case "document":
-        return `document:${data.projectId ?? ""}:${data.collectionId ?? ""}:${data.id ?? data.label}`;
+        return `document:${data.projectId ?? ""}:${data.databaseId ?? ""}:${data.collectionId ?? ""}:${data.id ?? data.label}`;
       case "functions":
         return data.id
           ? `function:${data.projectId ?? ""}:${data.id}`
