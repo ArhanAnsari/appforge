@@ -50,6 +50,9 @@ export function showLogsViewer(
           logs: getPlaceholderLogs(),
         });
         break;
+      case "openConsole":
+        await vscode.commands.executeCommand("appforge.openAppwriteConsole");
+        break;
     }
   });
 
