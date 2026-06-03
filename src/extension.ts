@@ -29,9 +29,6 @@ import { outputChannel } from "./core/output/outputChannel";
  * Activate the extension
  */
 export function activate(context: vscode.ExtensionContext) {
-  vscode.window.showInformationMessage(
-    "AppForge Activated"
-  );
   logger.initialize();
   logger.success(
     "EXTENSION",
