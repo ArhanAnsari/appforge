@@ -41,6 +41,10 @@ export function registerProjectCommands(
       async (arg: any) => {
         // Handle both tree item context and direct projectId
         const projectId = typeof arg === "string" ? arg : arg?.data?.id;
+        if (!projectId) {
+          vscode.window.showErrorMessage("No project selected");
+          return;
+        }
         await removeProjectCommand(
           projectStorage,
           appwriteClient,
@@ -169,9 +173,46 @@ async function switchProjectCommand(
   projectStorage: ProjectStorageService,
   appwriteClient: AppwriteClientService,
   treeProvider: AppForgeTreeDataProvider,
-  projectId: string,
+  projectId?: string,
 ): Promise<void> {
   try {
+    // If no projectId provided, show quick pick of all projects
+    if (!projectId) {
+      const projects = projectStorage.getProjects();
+
+      if (projects.length === 0) {
+        vscode.window.showInformationMessage(
+          "No projects found. Please add a project first using 'AppForge: Add Project'.",
+        );
+        return;
+      }
+
+      const quickPickItems: (vscode.QuickPickItem & { projectId: string })[] =
+        projects.map((project) => ({
+          label: project.projectName,
+          description: project.endpoint,
+          projectId: project.projectId,
+        }));
+
+      const selectedItem = await vscode.window.showQuickPick(quickPickItems, {
+        placeHolder: "Select a project to switch to",
+        matchOnDescription: true,
+      });
+
+      if (!selectedItem) {
+        // User cancelled
+        return;
+      }
+
+      projectId = selectedItem.projectId;
+    }
+
+    // Ensure projectId is defined (should always be true at this point)
+    if (!projectId) {
+      vscode.window.showErrorMessage("No project selected");
+      return;
+    }
+
     const project = projectStorage.getProjectById(projectId);
     if (!project) {
       vscode.window.showErrorMessage("Project not found");
@@ -190,7 +231,7 @@ async function switchProjectCommand(
           `Switch to project: ${project.projectName}`,
         );
         // Get API key
-        const apiKey = await projectStorage.getApiKey(projectId);
+        const apiKey = await projectStorage.getApiKey(projectId!);
         if (!apiKey) {
           throw new Error("API key not found in secure storage");
         }
@@ -206,9 +247,9 @@ async function switchProjectCommand(
 
         refreshManager.queueRefresh("all");
 
-        // Emit event
+        // Emit event (projectId is guaranteed to be string at this point)
         await EventBus.getInstance().emit("project.switched", {
-          projectId,
+          projectId: projectId as string,
           projectName: project.projectName,
         });
 
