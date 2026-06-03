@@ -1095,12 +1095,12 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
       projectId,
       collectionId,
       databaseId,
-      treeId: `attributes:${projectId}:${collectionId}`,
+      treeId: `attributes:${projectId}:${databaseId ?? ""}:${collectionId}`,
     };
     children.push(
       new AppForgeTreeItem(
         "🏷️ Attributes",
-        this.isExpanded(`attributes:${projectId}:${collectionId}`)
+        this.isExpanded(`attributes:${projectId}:${databaseId ?? ""}:${collectionId}`)
           ? vscode.TreeItemCollapsibleState.Expanded
           : vscode.TreeItemCollapsibleState.Collapsed,
         attributesData,
