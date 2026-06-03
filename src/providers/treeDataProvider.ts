@@ -1661,10 +1661,8 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
       }
 
       return buckets.map(
-        (bucket: any) =>
           new AppForgeTreeItem(
-            `📁 ${bucket.name} (${bucket.filesCount} files)`,
-            this.isExpanded(`bucket:${projectId}:${bucket.$id}`)
+            `📁 ${bucket.name} (${bucket.filesCount ?? 0} files)`,
               ? vscode.TreeItemCollapsibleState.Expanded
               : vscode.TreeItemCollapsibleState.Collapsed,
             {
