@@ -29,8 +29,19 @@ export function showLogsViewer(
     projectStorage.getActiveProjectId() || "",
   );
 
-  panel.webview.html = getLogsViewerHtml(activeProject?.projectName || "");
+  const projectName = activeProject?.projectName || "";
+  const safeProjectName = projectName.replace(/[&<>"']/g, (ch) => {
+    const map: Record<string, string> = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    };
+    return map[ch] ?? ch;
+  });
 
+  panel.webview.html = getLogsViewerHtml(safeProjectName);
   panel.webview.onDidReceiveMessage(async (message) => {
     switch (message.command) {
       case "refresh":
