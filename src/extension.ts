@@ -49,10 +49,6 @@ export function activate(context: vscode.ExtensionContext) {
     // Show the status bar
     statusBar.show();
 
-    vscode.window.showInformationMessage(
-      "Status bar initialized"
-    );
-
     // Initialize tree data provider for sidebar
     const treeDataProvider = new AppForgeTreeDataProvider(
       projectStorage,
