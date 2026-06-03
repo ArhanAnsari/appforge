@@ -281,9 +281,9 @@ function getLogsViewerHtml(projectName: string): string {
     </div>
     
     <div class="tabs">
-      <button class="tab active" onclick="showTab('overview')">Overview</button>
-      <button class="tab" onclick="showTab('logs')">Sample Logs</button>
-      <button class="tab" onclick="showTab('metrics')">Performance Metrics</button>
+      <button class="tab active" onclick="showTab(event, 'overview')">Overview</button>
+      <button class="tab" onclick="showTab(event, 'logs')">Sample Logs</button>
+      <button class="tab" onclick="showTab(event, 'metrics')">Performance Metrics</button>
     </div>
     
     <div id="overview" class="tab-content active">
