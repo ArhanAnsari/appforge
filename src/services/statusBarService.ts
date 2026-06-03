@@ -49,7 +49,7 @@ export class StatusBarService {
     const activeProjectId = this.projectStorage.getActiveProjectId();
 
     if (!activeProjectId) {
-      this.statusBarItem.text = "$(cloud) Appwrite: No project";
+      this.statusBarItem.text = "$(cloud) AppForge: No project";
       this.statusBarItem.show();
       console.log("[STATUSBAR] Updated text: No project selected");
       return;
@@ -59,14 +59,14 @@ export class StatusBarService {
     const activeProject = projects.find((p) => p.projectId === activeProjectId);
 
     if (activeProject) {
-      this.statusBarItem.text = `$(cloud) Appwrite: ${activeProject.projectName}`;
+      this.statusBarItem.text = `$(cloud) AppForge: ${activeProject.projectName}`;
       this.statusBarItem.show();
       console.log("[STATUSBAR] Updated text", {
         projectName: activeProject.projectName,
         projectId: activeProjectId,
       });
     } else {
-      this.statusBarItem.text = "$(cloud) Appwrite: Unknown project";
+      this.statusBarItem.text = "$(cloud) AppForge: Unknown project";
       this.statusBarItem.show();
       console.log("[STATUSBAR] Updated text: Unknown project", {
         projectId: activeProjectId,
