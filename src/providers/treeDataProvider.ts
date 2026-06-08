@@ -1660,9 +1660,13 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
         ];
       }
 
+      // FIX: Added the arrow function parameter definition (bucket: any) =>
       return buckets.map(
-          new AppForgeTreeItem(
+        (bucket: any) => {
+          const nodeKey = `bucket:${projectId}:${bucket.$id}`;
+          return new AppForgeTreeItem(
             `📁 ${bucket.name} (${bucket.filesCount ?? 0} files)`,
+            this.isExpanded(nodeKey)
               ? vscode.TreeItemCollapsibleState.Expanded
               : vscode.TreeItemCollapsibleState.Collapsed,
             {
@@ -1671,10 +1675,11 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
               id: bucket.$id,
               projectId,
               bucketId: bucket.$id,
-              treeId: `bucket:${projectId}:${bucket.$id}`,
+              treeId: nodeKey,
             },
             this.extensionUri,
-          ),
+          );
+        }
       );
     } catch (error) {
       outputChannel.error("[TREE]", "Error fetching buckets", error as Error);
