@@ -34,6 +34,14 @@ export class StatusBarService {
     this.updateStatusBar();
     this.show(); // Explicitly show on creation
 
+    // FIX: Listen for active project changes from the storage service
+    this.projectStorage.onDidChangeActiveProject((projectId) => {
+      console.log("[STATUSBAR] Active project change event received!", {
+        projectId,
+      });
+      this.updateStatusBar();
+    });
+
     console.log("[STATUSBAR] Show called on creation");
     console.log("[STATUSBAR] StatusBar item reference", {
       hasText: !!this.statusBarItem.text,

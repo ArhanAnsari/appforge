@@ -13,6 +13,10 @@ export class ProjectStorageService {
   private static readonly PROJECTS_STORAGE_KEY = "appforge.projects";
   private static readonly ACTIVE_PROJECT_KEY = "appforge.activeProject";
 
+  // FIX: Added Event Emitter to notify other components when active project changes
+  private _onDidChangeActiveProject = new vscode.EventEmitter<string | undefined>();
+  readonly onDidChangeActiveProject = this._onDidChangeActiveProject.event;
+
   constructor(
     private context: vscode.ExtensionContext,
     private secretStorage: vscode.SecretStorage,
@@ -107,6 +111,9 @@ export class ProjectStorageService {
       ProjectStorageService.ACTIVE_PROJECT_KEY,
       projectId,
     );
+
+    // FIX: Fire the change event so the Status Bar catches it instantly!
+    this._onDidChangeActiveProject.fire(projectId);
   }
 
   /**
