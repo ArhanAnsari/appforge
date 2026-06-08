@@ -55,6 +55,8 @@ export class StorageService {
       );
       const bucket = await storageClient.getBucket(bucketId);
 
+      outputChannel.info("[STORAGE] Raw bucket sample data:", JSON.stringify(bucket, null, 2));
+
       return {
         $id: bucket.$id,
         name: bucket.name,

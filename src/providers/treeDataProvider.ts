@@ -1630,19 +1630,9 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
         return [];
       }
 
-      console.log("[STORAGE] API call starting", {
-        endpoint: project.endpoint,
-      });
-
       const { StorageService } = await import("../services/storageService.js");
       const storageService = new StorageService(project, apiKey);
       const buckets = await storageService.listBuckets();
-
-      console.log("[STORAGE] API call success", { count: buckets.length });
-      console.log("[STORAGE] Found X buckets", {
-        projectId,
-        count: buckets.length,
-      });
 
       if (buckets.length === 0) {
         return [
@@ -1660,12 +1650,29 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
         ];
       }
 
-      // FIX: Added the arrow function parameter definition (bucket: any) =>
-      return buckets.map(
-        (bucket: any) => {
+      // FIX: Dynamically fetch the real-time file count for each bucket using Promise.all
+      // FIX: Safely read the length from the returned array
+      const bucketNodes = await Promise.all(
+        buckets.map(async (bucket: any) => {
           const nodeKey = `bucket:${projectId}:${bucket.$id}`;
+          let realFileCount = 0;
+
+          try {
+            // Call your existing listFiles service to read the files
+            const filesResponse = await storageService.listFiles(bucket.$id);
+            
+            // If it's a direct array, use .length. Otherwise, cast to any to read .total
+            if (Array.isArray(filesResponse)) {
+              realFileCount = filesResponse.length;
+            } else if (filesResponse) {
+              realFileCount = (filesResponse as any).total ?? (filesResponse as any).files?.length ?? 0;
+            }
+          } catch (fileFetchError) {
+            console.error(`[STORAGE] Failed to fetch count for bucket ${bucket.$id}:`, fileFetchError);
+          }
+
           return new AppForgeTreeItem(
-            `📁 ${bucket.name} (${bucket.filesCount ?? 0} files)`,
+            `📁 ${bucket.name} (${realFileCount} files)`,
             this.isExpanded(nodeKey)
               ? vscode.TreeItemCollapsibleState.Expanded
               : vscode.TreeItemCollapsibleState.Collapsed,
@@ -1679,8 +1686,10 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
             },
             this.extensionUri,
           );
-        }
+        })
       );
+
+      return bucketNodes;
     } catch (error) {
       outputChannel.error("[TREE]", "Error fetching buckets", error as Error);
       return [];
