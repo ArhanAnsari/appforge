@@ -763,7 +763,7 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
             label: "No databases",
             id: "empty",
             projectId,
-            treeId: `database:${projectId}:empty`,
+            treeId: `databases:${projectId}:empty`, // !!! FIX: Was database:
           };
           logger.info("TREE", "No databases found for project", { projectId });
           return [
@@ -899,6 +899,8 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
             label: "No collections",
             id: "empty",
             projectId,
+            databaseId,
+            treeId: `collection:${projectId}:${databaseId}:empty`, // !!! FIX: Add distinct treeId tracking
           };
           logger.info("TREE", "No collections found for database", {
             databaseId,
@@ -995,12 +997,18 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
           return [];
         }
 
-        const functionsClient = this.appwriteClient.createFunctionsService(
-          project,
-          apiKey,
-        );
-        const response = await functionsClient.list();
-        const functions = response.functions || [];
+        // FIX: Switch to an isolated, imported service instance instead of sharing the global state client
+        const { FunctionsService } =
+          await import("../services/functionsService.js");
+        const fnService = new FunctionsService(project, apiKey);
+
+        // Use the safe local service instance wrapper instead
+        // 1. Call the correct service method name
+        const response = await fnService.listFunctions();
+
+        // 2. FIX: The service already extracts and returns a clean array directly!
+        const functions = response || [];
+
         const children: AppForgeTreeItem[] = [];
 
         if (functions.length === 0) {
@@ -1023,7 +1031,7 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
 
         functions.forEach((fn: any) => {
           const fnData: TreeItemData = {
-            type: "functions",
+            type: "function",
             label: fn.name,
             id: fn.$id,
             projectId,
@@ -1100,7 +1108,9 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
     children.push(
       new AppForgeTreeItem(
         "🏷️ Attributes",
-        this.isExpanded(`attributes:${projectId}:${databaseId ?? ""}:${collectionId}`)
+        this.isExpanded(
+          `attributes:${projectId}:${databaseId ?? ""}:${collectionId}`,
+        )
           ? vscode.TreeItemCollapsibleState.Expanded
           : vscode.TreeItemCollapsibleState.Collapsed,
         attributesData,
@@ -1120,7 +1130,9 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
     children.push(
       new AppForgeTreeItem(
         "🔑 Indexes",
-        this.isExpanded(`indexes:${projectId}:${databaseId ?? ""}:${collectionId}`)
+        this.isExpanded(
+          `indexes:${projectId}:${databaseId ?? ""}:${collectionId}`,
+        )
           ? vscode.TreeItemCollapsibleState.Expanded
           : vscode.TreeItemCollapsibleState.Collapsed,
         indexesData,
@@ -1140,7 +1152,9 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
     children.push(
       new AppForgeTreeItem(
         "📄 Documents",
-        this.isExpanded(`documents:${projectId}:${databaseId ?? ""}:${collectionId}`)
+        this.isExpanded(
+          `documents:${projectId}:${databaseId ?? ""}:${collectionId}`,
+        )
           ? vscode.TreeItemCollapsibleState.Expanded
           : vscode.TreeItemCollapsibleState.Collapsed,
         documentsData,
@@ -1660,15 +1674,21 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
           try {
             // Call your existing listFiles service to read the files
             const filesResponse = await storageService.listFiles(bucket.$id);
-            
+
             // If it's a direct array, use .length. Otherwise, cast to any to read .total
             if (Array.isArray(filesResponse)) {
               realFileCount = filesResponse.length;
             } else if (filesResponse) {
-              realFileCount = (filesResponse as any).total ?? (filesResponse as any).files?.length ?? 0;
+              realFileCount =
+                (filesResponse as any).total ??
+                (filesResponse as any).files?.length ??
+                0;
             }
           } catch (fileFetchError) {
-            console.error(`[STORAGE] Failed to fetch count for bucket ${bucket.$id}:`, fileFetchError);
+            console.error(
+              `[STORAGE] Failed to fetch count for bucket ${bucket.$id}:`,
+              fileFetchError,
+            );
           }
 
           return new AppForgeTreeItem(
@@ -1686,7 +1706,7 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
             },
             this.extensionUri,
           );
-        })
+        }),
       );
 
       return bucketNodes;
