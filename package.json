@@ -111,7 +111,8 @@
       {
         "command": "appforge.viewLogs",
         "title": "AppForge: View Logs",
-        "category": "AppForge"
+        "category": "AppForge",
+        "icon": "$(output)"
       },
       {
         "command": "appforge.showSetupGuide",
@@ -198,12 +199,6 @@
         "title": "AppForge: Open Appwrite Console",
         "category": "AppForge",
         "icon": "$(link-external)"
-      },
-      {
-        "command": "appforge.viewLogs",
-        "title": "AppForge: View Logs",
-        "category": "AppForge",
-        "icon": "$(output)"
       },
       {
         "command": "appforge.viewFunctionLogs",
