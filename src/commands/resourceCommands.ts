@@ -9,8 +9,8 @@ import { AppwriteClientService } from "../services/appwriteClientService";
 import { AppForgeTreeDataProvider } from "../providers/treeDataProvider";
 import { showLogsViewer } from "../views/logsViewer";
 import { outputChannel } from "../core/output/outputChannel";
-import { logger } from "../utils/logger";
 import { refreshManager } from "../core/refresh/refreshManager";
+import { telemetryManager } from "../core/logs/logTelemetryManager";
 
 type RefreshScope = "all" | "tree" | "databases" | "functions" | "logs" | "specific";
 
@@ -42,14 +42,12 @@ export function registerResourceCommands(
     vscode.commands.registerCommand(
       "appforge.refreshResources",
       async (projectId?: string, resourceType?: string) => {
+        const startTime = Date.now();
         try {
           outputChannel.info(
             "[COMMANDS]",
             "Refresh Resources command invoked",
-            {
-              projectId,
-              resourceType,
-            },
+            { projectId, resourceType },
           );
 
           if (!projectId) {
@@ -63,32 +61,47 @@ export function registerResourceCommands(
             return;
           }
 
-          // Show refresh indicator
           vscode.window.showInformationMessage("🔄 Refreshing resources...");
 
-          // Trigger refresh through the tree provider
-          treeDataProvider.refresh();
+          // Synchronize core metadata target context
+          const currentProj = projectStorage.getProjectById(projectId);
+          const currentKey = await projectStorage.getApiKey(projectId);
+          if (currentProj && currentKey) {
+            telemetryManager.setContext(currentProj, currentKey);
+          }
 
-          // Use refresh manager to coordinate
+          treeDataProvider.refresh();
           refreshManager.queueRefresh(normalizeRefreshScope(resourceType));
+
+          const executionDuration = Date.now() - startTime;
+          telemetryManager.addApiLatency(executionDuration);
+
+          // Categorize processing delay metrics
+          if (resourceType === "databases") {
+            telemetryManager.setMetric("databaseLoadDuration", executionDuration);
+          } else if (resourceType === "functions") {
+            telemetryManager.setMetric("functionLoadDuration", executionDuration);
+          } else {
+            telemetryManager.setMetric("storageLoadDuration", executionDuration);
+          }
 
           outputChannel.success(
             "[COMMANDS]",
             "Resources refreshed",
             `Project: ${projectId}`,
+            executionDuration
           );
 
           vscode.window.showInformationMessage("✅ Resources refreshed");
         } catch (error) {
-          const message =
-            error instanceof Error ? error.message : String(error);
+          telemetryManager.incrementFailedRequests();
           outputChannel.error(
             "[COMMANDS]",
             "Refresh Resources error",
             error as Error,
           );
           vscode.window.showErrorMessage(
-            `Error refreshing resources: ${message}`,
+            `Error refreshing resources: ${error instanceof Error ? error.message : String(error)}`,
           );
         }
       },
@@ -118,9 +131,7 @@ export function registerResourceCommands(
             return;
           }
 
-          // Extract console URL from endpoint (remove /v1)
           const consoleUrl = project.endpoint.replace(/\/v1\s*$/, "");
-
           await vscode.env.openExternal(vscode.Uri.parse(consoleUrl));
 
           outputChannel.success(
@@ -129,20 +140,18 @@ export function registerResourceCommands(
             `Project: ${project.projectName}`,
           );
         } catch (error) {
-          const message =
-            error instanceof Error ? error.message : String(error);
           outputChannel.error(
             "[COMMANDS]",
             "Open Console error",
             error as Error,
           );
-          vscode.window.showErrorMessage(`Error opening console: ${message}`);
+          vscode.window.showErrorMessage(`Error opening console: ${error instanceof Error ? error.message : String(error)}`);
         }
       },
     ),
   );
 
-  // View Logs command (Logs Viewer placeholder)
+  // View Logs command
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "appforge.viewLogs",
@@ -150,22 +159,30 @@ export function registerResourceCommands(
         try {
           outputChannel.info("[COMMANDS]", "View Logs command invoked");
 
-          showLogsViewer(context, projectStorage, appwriteClient);
+          if (!projectId) {
+            projectId = projectStorage.getActiveProjectId();
+          }
+          if (projectId) {
+            const currentProj = projectStorage.getProjectById(projectId);
+            const currentKey = await projectStorage.getApiKey(projectId);
+            if (currentProj && currentKey) {
+              telemetryManager.setContext(currentProj, currentKey);
+            }
+          }
 
+          showLogsViewer(context, projectStorage, appwriteClient);
           outputChannel.info("[COMMANDS]", "Logs Viewer panel opened");
         } catch (error) {
-          const message =
-            error instanceof Error ? error.message : String(error);
           outputChannel.error("[COMMANDS]", "View Logs error", error as Error);
           vscode.window.showErrorMessage(
-            `Error opening logs viewer: ${message}`,
+            `Error opening logs viewer: ${error instanceof Error ? error.message : String(error)}`,
           );
         }
       },
     ),
   );
 
-  // View Function Logs command
+  // View Function Logs command (Connected MVP Implementation)
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "appforge.viewFunctionLogs",
@@ -174,31 +191,56 @@ export function registerResourceCommands(
           outputChannel.info(
             "[COMMANDS]",
             "View Function Logs command invoked",
-            {
-              functionId,
-              projectId,
-            },
+            { functionId, projectId },
           );
 
-          vscode.window.showInformationMessage(
-            "📋 Function Logs Viewer\n\n" +
-              "Coming in v0.2.1-alpha\n\n" +
-              "This feature will display:\n" +
-              "• Real-time function execution logs\n" +
-              "• Performance metrics\n" +
-              "• Error details and stack traces\n\n" +
-              "For now, view function logs in your Appwrite Console.",
-          );
+          if (!projectId) {
+            projectId = projectStorage.getActiveProjectId();
+          }
 
-          outputChannel.info("[COMMANDS]", "Function Logs - placeholder shown");
+          if (!projectId || !functionId) {
+            vscode.window.showErrorMessage("Missing absolute function or project targeting context details.");
+            return;
+          }
+
+          const project = projectStorage.getProjectById(projectId);
+          const apiKey = await projectStorage.getApiKey(projectId);
+
+          if (!project || !apiKey) {
+            vscode.window.showErrorMessage("Target infrastructure credential configurations are unavailable.");
+            return;
+          }
+
+          // Force view focus onto the panel interface
+          showLogsViewer(context, projectStorage, appwriteClient);
+          await vscode.commands.executeCommand("appforge.runDiagnostics", projectId);
+
+          const startTime = Date.now();
+          const { FunctionsService } = await import("../services/functionsService.js");
+          const fnService = new FunctionsService(project, apiKey);
+          
+          outputChannel.info("[FUNCTIONS]", `Querying deployment logs traces for: ${functionId}`);
+          const executions = await fnService.listExecutions(functionId);
+          telemetryManager.addApiLatency(Date.now() - startTime);
+
+          const transformedLogs = executions.map(exec => ({
+            id: exec.$id,
+            status: exec.status,
+            duration: exec.duration,
+            createdAt: exec.$createdAt,
+            errors: exec.statusCode >= 400 ? `Execution failed. Status code: ${exec.statusCode}` : "",
+          }));
+
+          telemetryManager.setFunctionExecutionLogs(functionId, transformedLogs);
+          outputChannel.success("[FUNCTIONS]", `Successfully tracked and delivered ${transformedLogs.length} live execution records.`);
         } catch (error) {
-          const message =
-            error instanceof Error ? error.message : String(error);
+          telemetryManager.incrementFailedRequests();
           outputChannel.error(
             "[COMMANDS]",
             "View Function Logs error",
             error as Error,
           );
+          vscode.window.showErrorMessage(`Failed to retrieve live execution metrics: ${error instanceof Error ? error.message : String(error)}`);
         }
       },
     ),
@@ -211,19 +253,9 @@ export function registerResourceCommands(
       async (projectId?: string) => {
         try {
           outputChannel.info("[COMMANDS]", "Run Diagnostics command invoked");
-
-          vscode.window.showInformationMessage(
-            "🔍 AppForge Diagnostics\n\n" +
-              "Running diagnostics on your environment...\n\n" +
-              "✅ Extension loaded\n" +
-              "✅ Services initialized\n" +
-              "✅ API client configured",
-          );
-
+          await vscode.commands.executeCommand("appforge.verifyAppwriteProjectEnvironment");
           outputChannel.success("[COMMANDS]", "Diagnostics completed");
         } catch (error) {
-          const message =
-            error instanceof Error ? error.message : String(error);
           outputChannel.error(
             "[COMMANDS]",
             "Run Diagnostics error",
