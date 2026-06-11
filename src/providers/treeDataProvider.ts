@@ -685,18 +685,31 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
           endpoint: project.endpoint,
         });
 
+        // FIX FOR LOCALHOST / SELF-SIGNED CERTIFICATES
         try {
-          const rawRes = await fetch(`${project.endpoint}/databases`, {
+          const isLocalhost = project.endpoint.includes("localhost") || project.endpoint.includes("127.0.0.1");
+          
+          const fetchOptions: any = {
             headers: {
               "X-Appwrite-Project": projectId,
               "X-Appwrite-Key": apiKey,
               "Content-Type": "application/json",
             },
-          });
+          };
+
+          // If self-hosted using local HTTPS, inject an agent that allows self-signed dev certificates
+          if (isLocalhost && project.endpoint.startsWith("https")) {
+            const https = await import("https");
+            fetchOptions.agent = new https.Agent({
+              rejectUnauthorized: false,
+            });
+          }
+
+          const rawRes = await fetch(`${project.endpoint}/databases`, fetchOptions);
 
           let rawBody: unknown;
           try {
-            rawBody = await rawRes.json();
+            rawBody = await rawRes.status === 204 ? {} : await rawRes.json();
           } catch {
             rawBody = await rawRes.text();
           }
@@ -763,7 +776,7 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
             label: "No databases",
             id: "empty",
             projectId,
-            treeId: `databases:${projectId}:empty`, // !!! FIX: Was database:
+            treeId: `databases:${projectId}:empty`,
           };
           logger.info("TREE", "No databases found for project", { projectId });
           return [
