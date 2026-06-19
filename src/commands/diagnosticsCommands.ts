@@ -406,7 +406,17 @@ async function runTelemetryDiagnosticsChain(
     telemetryManager.updateDiagnostic("endpointReachable", "pass", `Endpoint communication established safely. Code: ${res.status}`);
   } catch (err) {
     telemetryManager.incrementFailedRequests();
-    if (project.endpoint.includes("appwrite.io")) {
+
+    let isAppwriteCloudEndpoint = false;
+    try {
+      const endpointHost = new URL(project.endpoint).hostname.toLowerCase();
+      isAppwriteCloudEndpoint =
+        endpointHost === "appwrite.io" || endpointHost.endsWith(".appwrite.io");
+    } catch {
+      isAppwriteCloudEndpoint = false;
+    }
+
+    if (isAppwriteCloudEndpoint) {
       telemetryManager.updateDiagnostic("endpointReachable", "pass", "Appwrite Cloud endpoint responsive over edge route.");
     } else {
       telemetryManager.updateDiagnostic("endpointReachable", "fail", err instanceof Error ? err.message : "Connection dropped");
