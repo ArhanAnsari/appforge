@@ -1,7 +1,15 @@
 const esbuild = require("esbuild");
+const fs = require("fs");
+const path = require("path");
 
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
+
+// FIX: Programmatically guarantee output paths exist before compiling
+const distDir = path.join(__dirname, "dist");
+if (!fs.existsSync(distDir)) {
+	fs.mkdirSync(distDir, { recursive: true });
+}
 
 /**
  * @type {import('esbuild').Plugin}

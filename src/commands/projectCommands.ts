@@ -12,15 +12,13 @@ import { ProjectSetupPanel } from "../views/projectSetupPanel";
 import { EventBus } from "../core/events/eventBus";
 import { outputChannel } from "../core/output/outputChannel";
 import { refreshManager } from "../core/refresh/refreshManager";
+import { StatusBarService } from "../services/statusBarService";
 
 /**
  * Register project management commands
  */
 export function registerProjectCommands(
-  context: vscode.ExtensionContext,
-  projectStorage: ProjectStorageService,
-  appwriteClient: AppwriteClientService,
-  treeProvider: AppForgeTreeDataProvider,
+context: vscode.ExtensionContext, projectStorage: ProjectStorageService, appwriteClient: AppwriteClientService, treeProvider: AppForgeTreeDataProvider, statusBar?: StatusBarService,
 ): void {
   // Add Project
   context.subscriptions.push(
