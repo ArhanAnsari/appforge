@@ -14,6 +14,7 @@
  */
 
 import * as vscode from "vscode";
+import { telemetryManager } from "../logs/logTelemetryManager";
 
 interface LogEntry {
   level: "info" | "warn" | "error" | "success" | "debug";
@@ -90,6 +91,15 @@ export class OutputChannelManager {
     }
 
     this.write(entry);
+
+    // FIX: Intercept log levels and map to live telemetry streaming architecture
+    try {
+      const telemetryLevel =
+        level === "warn" ? "warning" : level === "debug" ? "info" : level;
+      telemetryManager.pushLog(telemetryLevel, category, message);
+    } catch (telemetryError) {
+      // Fail-safe to avoid blocking primary output channel loops
+    }
   }
 
   /**

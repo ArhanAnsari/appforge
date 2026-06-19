@@ -1,110 +1,103 @@
-# Change Log
+# AppForge v0.2.1-alpha
 
-All notable changes to the AppForge extension will be documented in this file.
+## 🚀 What's New
 
-## [0.1.1-alpha] - 2026-05-23
+### Self-Hosted Appwrite Support
 
-### Added
+AppForge now properly supports self-hosted Appwrite instances alongside Appwrite Cloud.
 
-- Project-scoped Appwrite client factories for multi-project safety
-- Raw REST and SDK diagnostics for database troubleshooting
-- Verify Appwrite Project Environment command
-- Stable TreeItem identity handling for cleaner TreeView refreshes
+#### Improvements
 
-### Changed
+* Fixed database discovery issues on self-hosted Appwrite deployments
+* Improved endpoint handling and validation
+* Better compatibility across different Appwrite versions
+* Enhanced project connection reliability
 
-- Replaced shared mutable client state with explicit per-project service creation
-- Updated database, function, and diagnostics workflows to resolve project context directly
-- Refreshed README and architecture docs for the v0.1.1-alpha release
+### Status Bar Improvements
 
-### Fixed
+* Added live active project display in the VS Code status bar
+* Automatic updates when switching projects
+* Improved project visibility across workspaces
 
-- Cross-project client contamination during async operations
-- Empty or inconsistent database results caused by shared client state
-- TreeView refresh drift during rapid project switching
+### Intelligent Refresh System
 
-## [0.1.0-alpha] - 2026-05-20
+* Introduced centralized Refresh Manager
+* Debounced refresh requests to prevent excessive API calls
+* Scoped resource refreshing
+* Improved resource synchronization after operations
 
-### Added
+### Event-Driven Architecture
 
-#### Core Infrastructure
+* Added lightweight Event Bus system
+* Real-time communication between extension modules
+* Improved extension responsiveness
+* Better state management
 
-- Complete TypeScript extension with strict type checking
-- Modular service architecture (AppwriteClientService, ProjectStorageService)
-- Tree data provider for sidebar view management
-- Zod-based validation for all user inputs
-- Secure credential storage using VS Code SecretStorage
+### Professional Logging & Telemetry
 
-#### Project Management
+* Added dedicated AppForge Output Channel
+* Structured logging system
+* Operation tracking and diagnostics
+* Performance telemetry collection
 
-- Add Project command with guided setup
-  - Project name validation (1-100 characters)
-  - Endpoint URL validation (HTTPS required)
-  - Project ID input
-  - API key secure storage
-- Remove Project command with confirmation dialog
-- Switch Project command with instant context switch
-- Active project auto-load on extension activation
+### Function Logs Enhancements
 
-#### Sidebar Tree View
-
-- AppForge activity bar icon
-- Projects section with expandable items
-- Databases section (expandable per project)
-- Collections section (nested under databases)
-- Functions section with status indicators
-- Logs quick access
-- Context menu for destructive actions (remove)
-- Refresh button for projects
-
-#### Commands
-
-- appforge.addProject
-- appforge.removeProject
-- appforge.switchProject
-- appforge.refreshProjects
-- appforge.refreshDatabases
-- appforge.createDocument (stub for v0.2.0)
-- appforge.deleteDocument (stub for v0.2.0)
-- appforge.executeFunction (stub for v0.2.0)
-- appforge.deployFunction (stub for v0.2.0)
-- appforge.viewLogs (stub for v0.2.0)
-
-#### User Experience
-
-- Loading progress indicators for async operations
-- Success notifications
-- Error notifications with context
-- Input validation with inline feedback
-- Command palette integration
-- Intuitive tree labels with icons
-
-#### Documentation
-
-- Comprehensive v0.1.0-alpha.md
-- Architecture documentation
-- Code comments on all public interfaces
-- Troubleshooting section
-
-### Technical Details
-
-- Language: TypeScript with strict mode
-- Build: esbuild with watch support
-- Runtime: VS Code Extension API (vscode ^1.120.0)
-- Dependencies:
-  - node-appwrite ^13.0.0
-  - zod ^3.22.4
-- No `any` types: Full type safety throughout
-
-### Known Limitations
-
-- Document management UI not included (Phase 2)
-- Function deployment not included (Phase 2)
-- Real-time log streaming not included (Phase 2)
-- Code snippet engine not included (Phase 2)
+* Improved function execution monitoring
+* Better log retrieval and presentation
+* Enhanced diagnostics for failed executions
 
 ---
 
-**Version**: 0.1.0-alpha  
-**Status**: Production-grade alpha  
-**Release Date**: May 20, 2026
+## 🛠️ Fixes
+
+### Fixed
+
+* Fixed self-hosted Appwrite database loading issues
+* Fixed project synchronization inconsistencies
+* Fixed refresh reliability after resource operations
+* Fixed status bar update inconsistencies
+* Improved error handling across multiple commands
+* Improved extension initialization stability
+
+### Internal Improvements
+
+* Added Refresh Manager architecture
+* Added Event Bus infrastructure
+* Added Output Channel manager
+* Improved service separation and maintainability
+* Enhanced debugging capabilities
+
+---
+
+## 📊 Technical Highlights
+
+### New Core Systems
+
+* Event Bus
+* Refresh Manager
+* Output Channel Manager
+* Enhanced Telemetry Integration
+* Improved Status Bar Service
+
+### Performance
+
+* Reduced redundant refresh operations
+* Better resource loading workflow
+* Improved command execution tracking
+* More efficient state updates
+
+---
+
+## 🔄 Upgrade Notes
+
+Existing users can safely upgrade from v0.2.0-alpha.
+
+No project migration is required.
+
+If you previously experienced issues with self-hosted Appwrite projects, reconnect your project after upgrading to ensure all resources are refreshed correctly.
+
+---
+
+## ❤️ Thanks
+
+Special thanks to the Appwrite community members who reported issues related to self-hosted deployments and resource synchronization. Your feedback directly helped improve AppForge v0.2.1-alpha.

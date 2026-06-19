@@ -2,9 +2,9 @@
   "name": "appforge",
   "displayName": "AppForge",
   "description": "AppForge is an Appwrite-native developer cockpit inside VS Code. Manage projects, databases, functions, and logs without leaving your editor.",
-  "version": "0.2.0-alpha",
+  "version": "0.2.1-alpha",
   "icon": "assets/appforge.png",
-  "publisher": "Arhan Ansari",
+  "publisher": "ArhanAnsari",
   "author": "Arhan Ansari",
   "license": "MIT",
   "repository": {
@@ -111,7 +111,8 @@
       {
         "command": "appforge.viewLogs",
         "title": "AppForge: View Logs",
-        "category": "AppForge"
+        "category": "AppForge",
+        "icon": "$(output)"
       },
       {
         "command": "appforge.showSetupGuide",
@@ -198,12 +199,6 @@
         "title": "AppForge: Open Appwrite Console",
         "category": "AppForge",
         "icon": "$(link-external)"
-      },
-      {
-        "command": "appforge.viewLogs",
-        "title": "AppForge: View Logs",
-        "category": "AppForge",
-        "icon": "$(output)"
       },
       {
         "command": "appforge.viewFunctionLogs",
