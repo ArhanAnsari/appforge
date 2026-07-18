@@ -4,7 +4,7 @@
 
 Manage Appwrite Projects, Databases, Collections, Documents, Functions, Storage, Logs, Diagnostics, and Self-Hosted Instances directly from VS Code.
 
-![Version](https://img.shields.io/badge/version-v0.2.1--alpha-blue)
+![Version](https://img.shields.io/badge/version-v0.2.2--alpha-blue)
 [![Alpha](https://img.shields.io/badge/status-alpha-f59e0b)](./CHANGELOG.md)
 ![VS Code](https://img.shields.io/badge/VS%20Code-1.120+-007ACC)
 [![VS Code](https://img.shields.io/badge/VS%20Code-extension-007acc)](https://code.visualstudio.com/api)
