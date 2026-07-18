@@ -1,11 +1,50 @@
+const APPWRITE_LIST_KEYS = [
+  "databases",
+  "collections",
+  "documents",
+  "functions",
+  "deployments",
+  "executions",
+  "variables",
+  "buckets",
+  "files",
+  "rows",
+  "items",
+] as const;
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+// FIX: Changed 'value is any[]' to a more specific check, 
+// or simply returning boolean to avoid breaking control flow narrowing.
+function isResourceArray(value: unknown[]): boolean {
+  if (value.length === 0) {
+    return true;
+  }
+  const first = value[0];
+  if (!isObjectRecord(first)) {
+    return false;
+  }
+  return Boolean(first.$id || first.id || first.name || first.key);
+}
+
 export function extractObjectArrayWithId(obj: unknown): any[] {
-  // Traverse recursively to find the first array of objects containing `$id` or `id` properties
-  // Logs the search process for debugging
+  if (!isObjectRecord(obj)) {
+    return [];
+  }
+
+  for (const key of APPWRITE_LIST_KEYS) {
+    const direct = obj[key];
+    // Since 'direct' is unknown, we check Array.isArray first
+    if (Array.isArray(direct) && isResourceArray(direct)) {
+      return direct as any[];
+    }
+  }
 
   const visited = new Set<unknown>();
-  const searchPath: string[] = [];
 
-  function check(value: unknown, path: string): any[] | null {
+  function check(value: unknown): any[] | null {
     if (value === null || value === undefined) {
       return null;
     }
@@ -15,17 +54,12 @@ export function extractObjectArrayWithId(obj: unknown): any[] {
     visited.add(value);
 
     if (Array.isArray(value)) {
-      if (value.length > 0 && typeof value[0] === "object") {
-        // Check whether items look like database/collection objects
-        const first = value[0] as any;
-        if (first && (first.$id || first.id || first.name)) {
-          // Found it!
-          return value as any[];
-        }
+      if (isResourceArray(value)) {
+        return value as any[];
       }
-      // Try deeper inside array items
-      for (let i = 0; i < value.length; i++) {
-        const found = check(value[i], `${path}[${i}]`);
+      // TypeScript now safely knows 'value' is still an array here
+      for (const item of value) {
+        const found = check(item);
         if (found) {
           return found;
         }
@@ -33,10 +67,16 @@ export function extractObjectArrayWithId(obj: unknown): any[] {
       return null;
     }
 
-    if (typeof value === "object") {
-      const o = value as Record<string, unknown>;
-      for (const k of Object.keys(o)) {
-        const found = check(o[k], `${path}.${k}`);
+    if (isObjectRecord(value)) {
+      for (const key of APPWRITE_LIST_KEYS) {
+        const typedValue = value[key];
+        if (Array.isArray(typedValue) && isResourceArray(typedValue)) {
+          return typedValue as any[];
+        }
+      }
+
+      for (const key of Object.keys(value)) {
+        const found = check(value[key]);
         if (found) {
           return found;
         }
@@ -46,5 +86,5 @@ export function extractObjectArrayWithId(obj: unknown): any[] {
     return null;
   }
 
-  return check(obj, "root") || [];
+  return check(obj) || [];
 }

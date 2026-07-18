@@ -1,6 +1,6 @@
 # AppForge Folder Structure
 
-This document describes the current AppForge project architecture as of **v0.2.1-alpha**.
+This document describes the current AppForge project architecture as of **v0.2.2-alpha**.
 
 ```text
 appforge/
@@ -64,6 +64,7 @@ appforge/
 ├── docs/
 │   ├── CHANGELOG.md
 │   ├── RELEASE_REPORT_v0.2.1-alpha.md
+│   ├── RELEASE_REPORT_v0.2.2-alpha.md
 │   └── FOLDER_STRUCTURE.md
 │
 ├── package.json
@@ -182,4 +183,4 @@ The architecture is designed to support future additions including:
 
 ---
 
-**Version:** v0.2.1-alpha
+**Version:** v0.2.2-alpha

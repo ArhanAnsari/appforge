@@ -302,4 +302,52 @@ export function registerResourceCommands(
       },
     ),
   );
+
+  // Copy Resource ID command
+  context.subscriptions.push(
+    vscode.commands.registerCommand("appforge.copyResourceId", async (arg?: any) => {
+      try {
+        const resourceId = arg?.data?.id ?? arg?.id;
+        const resourceType = arg?.data?.type ?? "resource";
+        if (!resourceId) {
+          vscode.window.showWarningMessage("No resource ID available to copy.");
+          return;
+        }
+        await vscode.env.clipboard.writeText(String(resourceId));
+        vscode.window.showInformationMessage(
+          `✓ Copied ${formatResourceType(resourceType)} ID: ${resourceId}`,
+        );
+      } catch (error) {
+        outputChannel.error(
+          "COMMANDS",
+          "Copy Resource ID command failed",
+          error as Error,
+        );
+        vscode.window.showErrorMessage(
+          `Failed to copy ID: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }),
+  );
+}
+
+function formatResourceType(type: string): string {
+  switch (type) {
+    case "project":
+      return "Project";
+    case "database":
+      return "Database";
+    case "collection":
+      return "Collection";
+    case "document":
+      return "Document";
+    case "function":
+      return "Function";
+    case "bucket":
+      return "Bucket";
+    case "file":
+      return "File";
+    default:
+      return "Resource";
+  }
 }

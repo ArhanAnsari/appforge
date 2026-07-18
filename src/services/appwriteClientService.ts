@@ -38,8 +38,9 @@ export class AppwriteClientService {
     project: AppwriteProject,
     apiKey: string,
   ): Client {
+    const endpoint = this.normalizeEndpoint(project.endpoint);
     return new Client()
-      .setEndpoint(project.endpoint)
+      .setEndpoint(endpoint)
       .setProject(project.projectId)
       .setKey(apiKey);
   }
@@ -89,6 +90,13 @@ export class AppwriteClientService {
    */
   public createTeamsService(project: AppwriteProject, apiKey: string): Teams {
     return new Teams(this.getProjectScopedClient(project, apiKey));
+  }
+  private normalizeEndpoint(endpoint: string): string {
+    const trimmed = endpoint.trim().replace(/\/+$/, "");
+    if (trimmed.endsWith("/v1")) {
+      return trimmed;
+    }
+    return `${trimmed}/v1`;
   }
 }
 

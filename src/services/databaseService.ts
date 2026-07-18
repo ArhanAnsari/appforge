@@ -2,8 +2,6 @@
  * Database Service
  * Handles all database operations: databases, collections, attributes, indexes, documents
  */
-
-import { Databases } from "node-appwrite";
 import {
   DatabaseItem,
   CollectionItem,
@@ -31,16 +29,24 @@ export class DatabaseService {
         this.project,
         this.apiKey,
       );
-      const response = await dbClient.list();
+      const listMethod = (dbClient as any).listDatabases?.bind(dbClient);
+      const response = listMethod
+        ? await listMethod()
+        : await (dbClient as any).list();
       const databases = extractObjectArrayWithId(response);
+      outputChannel.info("DATABASES", "Databases list response parsed", {
+        projectId: this.project.projectId,
+        total: (response as any)?.total,
+        count: databases.length,
+      });
 
       return databases.map((db: any) => ({
-        $id: db.$id,
-        name: db.name,
+        $id: String(db.$id ?? db.id ?? db.databaseId ?? ""),
+        name: String(db.name ?? db.$id ?? db.id ?? db.databaseId ?? "Unknown"),
       }));
     } catch (error) {
       outputChannel.error(
-        "[DATABASES]",
+        "DATABASES",
         "Failed to list databases",
         error as Error,
       );
@@ -84,15 +90,21 @@ export class DatabaseService {
       );
       const response = await dbClient.listCollections(databaseId);
       const collections = extractObjectArrayWithId(response);
+       outputChannel.info("DATABASES", "Collections list response parsed", {
+        projectId: this.project.projectId,
+        databaseId,
+        total: (response as any)?.total,
+        count: collections.length,
+      });
 
       return collections.map((col: any) => ({
-        $id: col.$id,
-        name: col.name,
-        $databaseId: col.$databaseId || databaseId,
+         $id: String(col.$id ?? col.id ?? col.collectionId ?? ""),
+        name: String(col.name ?? col.$id ?? col.id ?? col.collectionId ?? ""),
+        $databaseId: String(col.$databaseId || databaseId),
       }));
     } catch (error) {
       outputChannel.error(
-        "[DATABASES]",
+        "DATABASES",
         "Failed to list collections",
         error as Error,
       );
@@ -141,7 +153,7 @@ export class DatabaseService {
       };
     } catch (error) {
       outputChannel.error(
-        "[DATABASES]",
+        "DATABASES",
         "Failed to get collection details",
         error as Error,
       );

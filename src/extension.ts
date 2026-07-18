@@ -2,7 +2,7 @@
  * AppForge VS Code Extension
  * Appwrite-native developer cockpit inside VS Code
  *
- * Version: 0.2.1-alpha
+ * Version: 0.2.2-alpha
  *
  * This extension provides a complete project management interface for Appwrite,
  * enabling developers to manage databases, functions, storage, and more without leaving VS Code.
@@ -32,12 +32,12 @@ export function activate(context: vscode.ExtensionContext) {
   logger.initialize();
   logger.success(
     "EXTENSION",
-    "🚀 AppForge extension is now active (v0.2.1-alpha)",
+    "🚀 AppForge extension is now active (v0.2.2-alpha)",
   );
   outputChannel.initialize();
   outputChannel.info(
     "EXTENSION",
-    "AppForge extension is now active (v0.2.1-alpha)",
+    "AppForge extension is now active (v0.2.2-alpha)",
   );
 
   try {
@@ -64,6 +64,7 @@ export function activate(context: vscode.ExtensionContext) {
     // CRITICAL SAFEGUARD: Push visual components into subscriptions array
     // IMMEDIATELY so VS Code can auto-dispose them if anything fails downstream
     context.subscriptions.push(statusBar);
+    context.subscriptions.push(treeDataProvider);
     context.subscriptions.push(treeView);
 
     // Register each command block EXACTLY ONCE
@@ -148,9 +149,23 @@ async function loadActiveProjectOnActivation(
         "EXTENSION",
         `✓ Loaded active project: ${projectWithKey.projectName}`,
       );
+      return;
+    }
+    const projects = projectStorage.getProjects();
+    if (projects.length > 0) {
+      const fallbackProject = projects[0];
+      await projectStorage.setActiveProjectId(fallbackProject.projectId);
+      outputChannel.info(
+        "EXTENSION",
+        "Restored fallback active project from saved projects",
+        {
+          projectId: fallbackProject.projectId,
+          projectName: fallbackProject.projectName,
+        },
+      );
       outputChannel.success(
         "EXTENSION",
-        `Loaded active project: ${projectWithKey.projectName}`,
+        `Loaded active project: ${fallbackProject.projectName}`,
       );
     }
   } catch (error) {

@@ -2,7 +2,7 @@
   "name": "appforge",
   "displayName": "AppForge",
   "description": "AppForge is an Appwrite-native developer cockpit inside VS Code. Manage projects, databases, functions, and logs without leaving your editor.",
-  "version": "0.2.1-alpha",
+  "version": "0.2.2-alpha",
   "icon": "assets/appforge.png",
   "publisher": "ArhanAnsari",
   "author": "Arhan Ansari",
@@ -28,6 +28,9 @@
     "Other"
   ],
   "activationEvents": [
+    "onStartupFinished",
+    "onView:appforge.projectView",
+    "onCommand:appforge.addProject",
     "workspaceContains:.appforge"
   ],
   "main": "./dist/extension.js",
@@ -211,6 +214,12 @@
         "title": "AppForge: Run Diagnostics",
         "category": "AppForge",
         "icon": "$(debug)"
+      },
+      {
+        "command": "appforge.copyResourceId",
+        "title": "AppForge: Copy ID",
+        "category": "AppForge",
+        "icon": "$(clippy)"
       }
     ],
     "menus": {
@@ -251,6 +260,12 @@
           "icon": "$(link-external)"
         },
         {
+          "command": "appforge.copyResourceId",
+          "when": "viewItem == project",
+          "group": "2_copy",
+          "icon": "$(clippy)"
+        },
+        {
           "command": "appforge.refreshDatabases",
           "when": "viewItem == databases",
           "group": "1_modification",
@@ -273,9 +288,21 @@
           "icon": "$(refresh)"
         },
         {
+          "command": "appforge.copyResourceId",
+          "when": "viewItem == database",
+          "group": "2_copy",
+          "icon": "$(clippy)"
+        },
+        {
           "command": "appforge.viewDatabase",
           "when": "viewItem == collection",
           "group": "1_modification"
+        },
+        {
+          "command": "appforge.copyResourceId",
+          "when": "viewItem == collection",
+          "group": "2_copy",
+          "icon": "$(clippy)"
         },
         {
           "command": "appforge.createCollection",
@@ -292,6 +319,12 @@
           "command": "appforge.executeFunction",
           "when": "viewItem == function",
           "group": "1_modification"
+        },
+        {
+          "command": "appforge.copyResourceId",
+          "when": "viewItem == function",
+          "group": "2_copy",
+          "icon": "$(clippy)"
         },
         {
           "command": "appforge.viewFunctionLogs",
@@ -328,6 +361,12 @@
           "icon": "$(refresh)"
         },
         {
+          "command": "appforge.copyResourceId",
+          "when": "viewItem == bucket",
+          "group": "2_copy",
+          "icon": "$(clippy)"
+        },
+        {
           "command": "appforge.downloadFile",
           "when": "viewItem == file",
           "group": "1_modification"
@@ -336,6 +375,12 @@
           "command": "appforge.deleteFile",
           "when": "viewItem == file",
           "group": "1_modification"
+        },
+        {
+          "command": "appforge.copyResourceId",
+          "when": "viewItem == file || viewItem == document",
+          "group": "2_copy",
+          "icon": "$(clippy)"
         },
         {
           "command": "appforge.viewLogs",

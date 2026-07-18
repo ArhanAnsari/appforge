@@ -180,7 +180,9 @@ export class AppForgeTreeItem extends vscode.TreeItem {
 /**
  * Tree data provider for AppForge sidebar
  */
-export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForgeTreeItem> {
+export class AppForgeTreeDataProvider
+  implements vscode.TreeDataProvider<AppForgeTreeItem>, vscode.Disposable
+{
   private _onDidChangeTreeData: vscode.EventEmitter<
     AppForgeTreeItem | undefined | null | void
   > = new vscode.EventEmitter<AppForgeTreeItem | undefined | null | void>();
@@ -193,10 +195,13 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
     private appwriteClient: AppwriteClientService,
     private extensionUri: vscode.Uri,
   ) {}
-
+  
   private view?: vscode.TreeView<AppForgeTreeItem>;
   private expandedIds: Set<string> = new Set();
   private loadingNodes: Map<string, boolean> = new Map();
+  private viewDisposables: vscode.Disposable[] = [];
+  private refreshUnsubscribe?: () => void;
+  private loadingUnsubscribe?: () => void;
 
   /**
    * Attach the TreeView instance so we can listen to expand/collapse and
@@ -204,23 +209,33 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
    */
   public attachView(view: vscode.TreeView<AppForgeTreeItem>): void {
     this.view = view;
+    this.viewDisposables.forEach((disposable) => disposable.dispose());
+    this.viewDisposables = [];
+    this.refreshUnsubscribe?.();
+    this.loadingUnsubscribe?.();
+    this.refreshUnsubscribe = undefined;
+    this.loadingUnsubscribe = undefined;
 
     // Track expansion state
-    view.onDidExpandElement((e) => {
-      const id = e.element?.id;
-      if (id) {
-        this.expandedIds.add(id);
-      }
-    });
-    view.onDidCollapseElement((e) => {
-      const id = e.element?.id;
-      if (id) {
-        this.expandedIds.delete(id);
-      }
-    });
+    this.viewDisposables.push(
+      view.onDidExpandElement((e) => {
+        const id = e.element?.id;
+        if (id) {
+          this.expandedIds.add(id);
+        }
+      }),
+    );
+    this.viewDisposables.push(
+      view.onDidCollapseElement((e) => {
+        const id = e.element?.id;
+        if (id) {
+          this.expandedIds.delete(id);
+        }
+      }),
+    );
 
     // Subscribe to refresh manager events
-    refreshManager.onRefresh((request) => {
+    this.refreshUnsubscribe = refreshManager.onRefresh((request) => {
       // For now, trigger a refresh and mark a simple loading state
       try {
         // mark a generic loading indicator for the scope
@@ -242,7 +257,8 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
       }
     });
 
-    refreshManager.onLoadingChange((nodeId, isLoading) => {
+    this.loadingUnsubscribe = refreshManager.onLoadingChange(
+      (nodeId, isLoading) => {
       // When loading state changes, re-render affected nodes
       try {
         if (isLoading) {
@@ -258,7 +274,8 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
           e as Error,
         );
       }
-    });
+    },
+    );
   }
 
   /**
@@ -266,6 +283,16 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
    */
   public refresh(): void {
     this._onDidChangeTreeData.fire(null);
+  }
+
+    public dispose(): void {
+    this.viewDisposables.forEach((disposable) => disposable.dispose());
+    this.viewDisposables = [];
+    this.refreshUnsubscribe?.();
+    this.loadingUnsubscribe?.();
+    this.refreshUnsubscribe = undefined;
+    this.loadingUnsubscribe = undefined;
+    this._onDidChangeTreeData.dispose();
   }
 
   private isExpanded(nodeId: string): boolean {
@@ -647,127 +674,17 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
 
       // Now fetch databases (with robust diagnostics and timeout)
       try {
-        console.log("[TREE] Expanding databases node", {
+        outputChannel.info("DATABASES", "Loading databases from API", {
           projectId,
           endpoint: project.endpoint,
         });
-        console.log("[DATABASES] Fetching databases", { projectId });
-
-        outputChannel.debug("DATABASES", "Fetch starting", {
-          requestedProjectId: projectId,
-          activeProjectId: this.projectStorage.getActiveProjectId(),
-          expectedEndpoint: project.endpoint,
-        });
-        logger.debug("TREE", "Fetching databases for project", {
+        logger.info("TREE", "Loading databases from API", {
           projectId,
           endpoint: project.endpoint,
-          activeProjectId: this.projectStorage.getActiveProjectId(),
         });
-
-        // Log the exact project context being used
-        logger.info("TREE", "=== PROJECT CONTEXT ===", null);
-        logger.info("TREE", "Target project ID", projectId);
-        logger.info("TREE", "Target endpoint", project.endpoint);
-        logger.info(
-          "TREE",
-          "Active project ID from storage",
-          this.projectStorage.getActiveProjectId(),
-        );
-        logger.info(
-          "TREE",
-          "Context matches",
-          this.projectStorage.getActiveProjectId() === projectId,
-        );
-        logger.info("TREE", "=== END PROJECT CONTEXT ===", null);
-
-        logger.info("TREE", "Starting API call to list databases...", null);
-        console.log("[DATABASES] API call starting", {
-          endpoint: project.endpoint,
-        });
-
-        // FIX FOR LOCALHOST / SELF-SIGNED CERTIFICATES
-        try {
-          const isLocalhost = project.endpoint.includes("localhost") || project.endpoint.includes("127.0.0.1");
-          
-          const fetchOptions: any = {
-            headers: {
-              "X-Appwrite-Project": projectId,
-              "X-Appwrite-Key": apiKey,
-              "Content-Type": "application/json",
-            },
-          };
-
-          // If self-hosted using local HTTPS, inject an agent that allows self-signed dev certificates
-          if (isLocalhost && project.endpoint.startsWith("https")) {
-            const https = await import("https");
-            fetchOptions.agent = new https.Agent({
-              rejectUnauthorized: false,
-            });
-          }
-
-          const rawRes = await fetch(`${project.endpoint}/databases`, fetchOptions);
-
-          let rawBody: unknown;
-          try {
-            rawBody = await rawRes.status === 204 ? {} : await rawRes.json();
-          } catch {
-            rawBody = await rawRes.text();
-          }
-
-          outputChannel.debug("DATABASES", "RAW REST RESPONSE", {
-            projectId,
-            status: rawRes.status,
-            body: rawBody,
-          });
-        } catch (rawFetchError) {
-          outputChannel.error(
-            "DATABASES",
-            "RAW REST fetch failed",
-            rawFetchError as Error,
-          );
-        }
-
-        // Fetch databases with timeout
-        const databasesClient = this.appwriteClient.createDatabasesService(
-          project,
-          apiKey,
-        );
-        outputChannel.debug("DATABASES", "Client config", {
-          endpoint: project.endpoint,
-          project: project.projectId,
-        });
-
-        let response: any;
-        try {
-          response = await Promise.race([
-            databasesClient.list(),
-            new Promise((_, reject) =>
-              setTimeout(
-                () => reject(new Error("Database fetch timeout (30s)")),
-                30000,
-              ),
-            ),
-          ]);
-        } catch (fetchError) {
-          console.error("[DATABASES] API call failed", fetchError);
-          outputChannel.error("DATABASES", "Fetch failed", fetchError as Error);
-          throw fetchError;
-        }
-
-        logger.success("TREE", "API call completed successfully", null);
-
-        const databases = extractObjectArrayWithId(response);
-        console.log("[DATABASES] API call success", {
-          responseType: typeof response,
-          hasTotal: !!response?.total,
-          hasDatabases: !!response?.databases,
-          databaseCount: databases.length,
-        });
-        console.log("[DATABASES] Found X databases", {
-          projectId,
-          count: databases.length,
-        });
-
+        const { DatabaseService } = await import("../services/databaseService.js");
+        const databaseService = new DatabaseService(project, apiKey);
+        const databases = await databaseService.listDatabases();
         const children: AppForgeTreeItem[] = [];
 
         if (databases.length === 0) {
@@ -789,9 +706,9 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
           ];
         }
 
-        databases.forEach((db: any) => {
-          const id = db.$id || db.id || db.databaseId || db.name;
-          const name = db.name || db.$id || db.id;
+        databases.forEach((db) => {
+          const id = db.$id;
+          const name = db.name || db.$id;
           const dbData: TreeItemData = {
             type: "database",
             label: name,
@@ -814,8 +731,9 @@ export class AppForgeTreeDataProvider implements vscode.TreeDataProvider<AppForg
           );
         });
 
-        outputChannel.debug("DATABASES", "Final mapped nodes", {
+        outputChannel.info("DATABASES", "Mapped databases to tree nodes", {
           projectId,
+          count: children.length,
           ids: children.map((item) => item.id),
         });
 
