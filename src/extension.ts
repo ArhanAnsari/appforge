@@ -2,7 +2,7 @@
  * AppForge VS Code Extension
  * Appwrite-native developer cockpit inside VS Code
  *
- * Version: 0.2.1-alpha
+ * Version: 0.2.2-alpha
  *
  * This extension provides a complete project management interface for Appwrite,
  * enabling developers to manage databases, functions, storage, and more without leaving VS Code.
@@ -32,20 +32,33 @@ export function activate(context: vscode.ExtensionContext) {
   logger.initialize();
   logger.success(
     "EXTENSION",
-    "🚀 AppForge extension is now active (v0.2.1-alpha)",
+    "🚀 AppForge extension is now active (v0.2.2-alpha)",
   );
   outputChannel.initialize();
   outputChannel.info(
     "EXTENSION",
-    "AppForge extension is now active (v0.2.1-alpha)",
+    "AppForge extension is now active (v0.2.2-alpha)",
   );
 
   try {
     // Initialize core structural lifecycle services
     const projectStorage = new ProjectStorageService(context, context.secrets);
-    const appwriteClient = AppwriteClientService.getInstance();
-    const statusBar = new StatusBarService(projectStorage);
+    
+    // Auto-load active project sequence on startup execution before retrieving client instance
+    loadActiveProjectOnActivation(projectStorage);
 
+    // Guaranteed fallback or initialized singleton instance
+    let appwriteClient = AppwriteClientService.getInstance();
+    if (!appwriteClient) {
+      // Create a default instance to guarantee non-null reference for command handlers
+      appwriteClient = AppwriteClientService.createInstance(
+        "https://cloud.appwrite.io/v1",
+        "default",
+        ""
+      );
+    }
+
+    const statusBar = new StatusBarService(projectStorage);
     statusBar.show();
 
     const treeDataProvider = new AppForgeTreeDataProvider(
@@ -61,12 +74,12 @@ export function activate(context: vscode.ExtensionContext) {
     });
     treeDataProvider.attachView(treeView);
 
-    // CRITICAL SAFEGUARD: Push visual components into subscriptions array
-    // IMMEDIATELY so VS Code can auto-dispose them if anything fails downstream
+    // Push visual components into subscriptions array immediately
     context.subscriptions.push(statusBar);
+    context.subscriptions.push(treeDataProvider);
     context.subscriptions.push(treeView);
 
-    // Register each command block EXACTLY ONCE
+    // Register each command block using the non-null appwriteClient
     registerProjectCommands(
       context,
       projectStorage,
@@ -118,9 +131,6 @@ export function activate(context: vscode.ExtensionContext) {
       treeDataProvider,
     );
 
-    // Auto-load active project sequence on startup execution
-    loadActiveProjectOnActivation(projectStorage);
-
     logger.success("EXTENSION", "✓ AppForge initialized successfully");
     outputChannel.success("EXTENSION", "AppForge initialized successfully");
   } catch (error) {
@@ -144,13 +154,32 @@ async function loadActiveProjectOnActivation(
   try {
     const projectWithKey = await projectStorage.getActiveProjectWithApiKey();
     if (projectWithKey) {
+      AppwriteClientService.createInstance(
+        projectWithKey.endpoint,
+        projectWithKey.projectId,
+        projectWithKey.apiKey
+      );
       logger.success(
         "EXTENSION",
         `✓ Loaded active project: ${projectWithKey.projectName}`,
       );
+      return;
+    }
+    const projects = projectStorage.getProjects();
+    if (projects.length > 0) {
+      const fallbackProject = projects[0];
+      await projectStorage.setActiveProjectId(fallbackProject.projectId);
+      outputChannel.info(
+        "EXTENSION",
+        "Restored fallback active project from saved projects",
+        {
+          projectId: fallbackProject.projectId,
+          projectName: fallbackProject.projectName,
+        },
+      );
       outputChannel.success(
         "EXTENSION",
-        `Loaded active project: ${projectWithKey.projectName}`,
+        `Loaded active project: ${fallbackProject.projectName}`,
       );
     }
   } catch (error) {

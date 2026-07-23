@@ -8,6 +8,7 @@ import { ProjectStorageService } from "./projectStorageService";
 
 export class StatusBarService {
   private statusBarItem: vscode.StatusBarItem;
+  private activeProjectSubscription?: vscode.Disposable;
 
   constructor(private projectStorage: ProjectStorageService) {
     // [STATUSBAR] Created with LEFT alignment and priority 1000
@@ -35,12 +36,14 @@ export class StatusBarService {
     this.show(); // Explicitly show on creation
 
     // FIX: Listen for active project changes from the storage service
-    this.projectStorage.onDidChangeActiveProject((projectId) => {
-      console.log("[STATUSBAR] Active project change event received!", {
-        projectId,
-      });
-      this.updateStatusBar();
-    });
+    this.activeProjectSubscription = this.projectStorage.onDidChangeActiveProject(
+      (projectId) => {
+        console.log("[STATUSBAR] Active project change event received!", {
+          projectId,
+        });
+        this.updateStatusBar();
+      },
+    );
 
     console.log("[STATUSBAR] Show called on creation");
     console.log("[STATUSBAR] StatusBar item reference", {
@@ -101,6 +104,8 @@ export class StatusBarService {
    * Dispose of the status bar
    */
   public dispose(): void {
+    this.activeProjectSubscription?.dispose();
+    this.activeProjectSubscription = undefined;
     this.statusBarItem.dispose();
   }
 }

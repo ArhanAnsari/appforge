@@ -1,9 +1,7 @@
 /**
  * Database Service
- * Handles all database operations: databases, collections, attributes, indexes, documents
+ * Handles database & collection/table discovery via TablesDB unified endpoints
  */
-
-import { Databases } from "node-appwrite";
 import {
   DatabaseItem,
   CollectionItem,
@@ -12,96 +10,128 @@ import {
   DocumentItem,
   AppwriteProject,
 } from "../types";
-import { appwriteClientService } from "./appwriteClientService";
+import { AppwriteClientService } from "./appwriteClientService";
 import { outputChannel } from "../core/output/outputChannel";
-import { extractObjectArrayWithId } from "../utils/responseParser";
 
 export class DatabaseService {
+  private clientService: AppwriteClientService;
+
   constructor(
     private project: AppwriteProject,
     private apiKey: string,
-  ) {}
+  ) {
+    this.clientService = AppwriteClientService.createForProject(this.project, this.apiKey);
+  }
 
   /**
-   * List all databases for the project
+   * Universal response parser for TablesDB (/tablesdb) and Databases (/databases) payloads
+   */
+  private extractItems(response: any): any[] {
+    if (!response) return [];
+    if (Array.isArray(response)) return response;
+    if (Array.isArray(response.databases)) return response.databases;
+    if (Array.isArray(response.tables)) return response.tables;
+    if (Array.isArray(response.collections)) return response.collections;
+    if (Array.isArray(response.documents)) return response.documents;
+    if (Array.isArray(response.rows)) return response.rows;
+    return [];
+  }
+
+  /**
+   * List all databases for the project using TablesDB primary endpoint (GET /tablesdb via tablesDB.list())
    */
   async listDatabases(): Promise<DatabaseItem[]> {
     try {
-      const dbClient = appwriteClientService.createDatabasesService(
-        this.project,
-        this.apiKey,
+      const tablesDB = this.clientService.getTablesDBService();
+      const dbClient = this.clientService.getDatabasesService();
+
+      let response: any;
+
+      // 1. Primary: Use tablesDB.list() -> Hits GET /tablesdb which returns ALL databases
+      if (tablesDB && typeof tablesDB.list === "function") {
+        try {
+          response = await tablesDB.list();
+        } catch (tablesDbError) {
+          outputChannel.warn(
+            "DATABASES",
+            `TablesDB list failed, falling back to legacy Databases API for project [${this.project.projectId}]`
+          );
+          response = await dbClient.list();
+        }
+      } else {
+        response = await dbClient.list();
+      }
+
+      const databases = this.extractItems(response);
+
+      outputChannel.info(
+        "DATABASES",
+        `Fetched ${databases.length} database(s) for project [${this.project.projectId}]`,
+        {
+          projectId: this.project.projectId,
+          total: response?.total ?? databases.length,
+        }
       );
-      const response = await dbClient.list();
-      const databases = extractObjectArrayWithId(response);
 
       return databases.map((db: any) => ({
-        $id: db.$id,
-        name: db.name,
+        $id: String(db.$id ?? db.id ?? db.databaseId ?? ""),
+        name: String(db.name ?? db.$id ?? db.id ?? "Unnamed Database"),
       }));
     } catch (error) {
       outputChannel.error(
-        "[DATABASES]",
-        "Failed to list databases",
+        "DATABASES",
+        `Failed to list databases for project [${this.project.projectId}]`,
         error as Error,
       );
-      return [];
+      throw error;
     }
   }
 
   /**
-   * Get a specific database
-   */
-  async getDatabase(databaseId: string): Promise<DatabaseItem | null> {
-    try {
-      const dbClient = appwriteClientService.createDatabasesService(
-        this.project,
-        this.apiKey,
-      );
-      const db = await dbClient.get(databaseId);
-
-      return {
-        $id: db.$id,
-        name: db.name,
-      };
-    } catch (error) {
-      outputChannel.error(
-        "[DATABASES]",
-        "Failed to get database",
-        error as Error,
-      );
-      return null;
-    }
-  }
-
-  /**
-   * List collections in a database
+   * List collections / tables inside a database
    */
   async listCollections(databaseId: string): Promise<CollectionItem[]> {
     try {
-      const dbClient = appwriteClientService.createDatabasesService(
-        this.project,
-        this.apiKey,
-      );
-      const response = await dbClient.listCollections(databaseId);
-      const collections = extractObjectArrayWithId(response);
+      const tablesDB = this.clientService.getTablesDBService();
+      const dbClient = this.clientService.getDatabasesService();
+
+      let response: any;
+
+      // Primary: query TablesDB listTables (GET /tablesdb/{databaseId}/tables)
+      if (tablesDB && typeof tablesDB.listTables === "function") {
+        try {
+          // Supports positional databaseId or object parameter signature
+          response = await (tablesDB as any).listTables(databaseId);
+        } catch {
+          try {
+            response = await (tablesDB as any).listTables({ databaseId });
+          } catch {
+            response = await dbClient.listCollections(databaseId);
+          }
+        }
+      } else {
+        response = await dbClient.listCollections(databaseId);
+      }
+
+      const collections = this.extractItems(response);
 
       return collections.map((col: any) => ({
-        $id: col.$id,
-        name: col.name,
-        $databaseId: col.$databaseId || databaseId,
+        $id: String(col.$id ?? col.id ?? col.tableId ?? col.collectionId ?? ""),
+        name: String(col.name ?? col.$id ?? col.id ?? "Unnamed Collection"),
+        $databaseId: String(col.$databaseId || databaseId),
       }));
     } catch (error) {
       outputChannel.error(
-        "[DATABASES]",
-        "Failed to list collections",
+        "DATABASES",
+        `Failed to list collections/tables for Database ID: ${databaseId}`,
         error as Error,
       );
-      return [];
+      throw error;
     }
   }
 
   /**
-   * Get collection details including attributes and indexes
+   * Get collection / table details including attributes and indexes
    */
   async getCollectionDetails(
     databaseId: string,
@@ -112,11 +142,7 @@ export class DatabaseService {
     indexes: IndexItem[];
   }> {
     try {
-      const dbClient = appwriteClientService.createDatabasesService(
-        this.project,
-        this.apiKey,
-      );
-
+      const dbClient = this.clientService.getDatabasesService();
       const collection = await dbClient.getCollection(databaseId, collectionId);
 
       return {
@@ -140,11 +166,7 @@ export class DatabaseService {
         })),
       };
     } catch (error) {
-      outputChannel.error(
-        "[DATABASES]",
-        "Failed to get collection details",
-        error as Error,
-      );
+      outputChannel.error("DATABASES", "Failed to get collection details", error as Error);
       return {
         collection: { $id: collectionId, name: "", $databaseId: databaseId },
         attributes: [],
@@ -154,7 +176,7 @@ export class DatabaseService {
   }
 
   /**
-   * List documents in a collection (max 100)
+   * List documents / rows
    */
   async listDocuments(
     databaseId: string,
@@ -162,122 +184,52 @@ export class DatabaseService {
     limit: number = 100,
   ): Promise<DocumentItem[]> {
     try {
-      const dbClient = appwriteClientService.createDatabasesService(
-        this.project,
-        this.apiKey,
-      );
-
-      // Fetch documents without query strings (Appwrite SDK v13 limitation)
+      const dbClient = this.clientService.getDatabasesService();
       const response = await dbClient.listDocuments(databaseId, collectionId);
-
-      const documents = extractObjectArrayWithId(response);
-      // Limit to specified number of documents
+      const documents = this.extractItems(response);
       return documents.slice(0, limit);
     } catch (error) {
-      outputChannel.error(
-        "[DATABASES]",
-        "Failed to list documents",
-        error as Error,
-      );
+      outputChannel.error("DATABASES", "Failed to list documents", error as Error);
       return [];
     }
   }
 
-  /**
-   * Get a specific document
-   */
   async getDocument(
     databaseId: string,
     collectionId: string,
     documentId: string,
   ): Promise<DocumentItem | null> {
     try {
-      const dbClient = appwriteClientService.createDatabasesService(
-        this.project,
-        this.apiKey,
-      );
-      const doc = await dbClient.getDocument(
-        databaseId,
-        collectionId,
-        documentId,
-      );
+      const dbClient = this.clientService.getDatabasesService();
+      const doc = await dbClient.getDocument(databaseId, collectionId, documentId);
       return doc as DocumentItem;
     } catch (error) {
-      outputChannel.error(
-        "[DATABASES]",
-        "Failed to get document",
-        error as Error,
-      );
+      outputChannel.error("DATABASES", "Failed to get document", error as Error);
       return null;
     }
   }
 
-  /**
-   * Create a new database
-   */
   async createDatabase(databaseName: string): Promise<DatabaseItem | null> {
     try {
-      const dbClient = appwriteClientService.createDatabasesService(
-        this.project,
-        this.apiKey,
-      );
-      const db = await dbClient.create(String(Math.random()), databaseName);
-
-      outputChannel.success(
-        "[DATABASES]",
-        "Database created",
-        `${databaseName} (${db.$id})`,
-      );
-
-      return {
-        $id: db.$id,
-        name: db.name,
-      };
+      const dbClient = this.clientService.getDatabasesService();
+      const db = await dbClient.create("unique()", databaseName);
+      return { $id: db.$id, name: db.name };
     } catch (error) {
-      outputChannel.error(
-        "[DATABASES]",
-        "Failed to create database",
-        error as Error,
-      );
+      outputChannel.error("DATABASES", "Failed to create database", error as Error);
       return null;
     }
   }
 
-  /**
-   * Create a collection in a database
-   */
   async createCollection(
     databaseId: string,
     collectionName: string,
   ): Promise<CollectionItem | null> {
     try {
-      const dbClient = appwriteClientService.createDatabasesService(
-        this.project,
-        this.apiKey,
-      );
-      const col = await dbClient.createCollection(
-        databaseId,
-        String(Math.random()),
-        collectionName,
-      );
-
-      outputChannel.success(
-        "[DATABASES]",
-        "Collection created",
-        `${collectionName} (${col.$id})`,
-      );
-
-      return {
-        $id: col.$id,
-        name: col.name,
-        $databaseId: databaseId,
-      };
+      const dbClient = this.clientService.getDatabasesService();
+      const col = await dbClient.createCollection(databaseId, "unique()", collectionName);
+      return { $id: col.$id, name: col.name, $databaseId: databaseId };
     } catch (error) {
-      outputChannel.error(
-        "[DATABASES]",
-        "Failed to create collection",
-        error as Error,
-      );
+      outputChannel.error("DATABASES", "Failed to create collection", error as Error);
       return null;
     }
   }

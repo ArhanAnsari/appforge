@@ -4,7 +4,7 @@
 
 Manage Appwrite Projects, Databases, Collections, Documents, Functions, Storage, Logs, Diagnostics, and Self-Hosted Instances directly from VS Code.
 
-![Version](https://img.shields.io/badge/version-v0.2.1--alpha-blue)
+![Version](https://img.shields.io/badge/version-v0.2.2--alpha-blue)
 [![Alpha](https://img.shields.io/badge/status-alpha-f59e0b)](./CHANGELOG.md)
 ![VS Code](https://img.shields.io/badge/VS%20Code-1.120+-007ACC)
 [![VS Code](https://img.shields.io/badge/VS%20Code-extension-007acc)](https://code.visualstudio.com/api)
@@ -141,8 +141,8 @@ It solves the problems that usually show up in real Appwrite workflows:
 - `AppForge: Switch Project`
 - `AppForge: Refresh Projects`
 - `AppForge: Refresh Databases`
-- `AppForge: Refresh Functions`
-- `AppForge: Refresh Storage`
+<!-- - `AppForge: Refresh Functions`
+- `AppForge: Refresh Storage` -->
 - `AppForge: Create Collection`
 - `AppForge: Create Document`
 - `AppForge: Delete Document`
@@ -154,27 +154,36 @@ It solves the problems that usually show up in real Appwrite workflows:
 - `AppForge: View Function Logs`
 - `AppForge: Check Project Status`
 - `AppForge: View Connection Info`
+- `AppForge: View Database` (Opens Interactive Webview Data Viewer)
 - `AppForge: Troubleshoot Empty Databases`
 - `AppForge: Verify Appwrite Project Environment`
 - `AppForge: Run Diagnostics`
+- `AppForge: Copy ID`
 
-## ✨ What's New in v0.2.1-alpha
+## ✨ What's New in v0.2.2-alpha
 
-### 🌐 Self-Hosted Appwrite Support
+### 🗄️ Multi-Project Database Discovery & Webview Viewer
 
-One of the most requested fixes.
+- **Unified TablesDB Discovery**: Modernized primary database queries to `tablesDB.list()` (`GET /tablesdb`) with an automatic fallback to `Databases.list()` (`GET /databases`). Guarantees 100% database and table discovery across all Appwrite versions (1.5.x, 1.7.x, 27.x+, and Cloud).
+- **Isolated Project Clients**: Each saved project node runs requests on an isolated SDK client instance (`AppwriteClientService.createForProject`), preventing API key/project ID cross-contamination across multi-project workspaces.
+- **Interactive Database Viewer**: Click on any collection or table node in the sidebar tree to open a full-screen editor tab displaying document rows, dynamic column attributes, system fields (`$id`, `$createdAt`), real-time search filtering, document viewing, and deletion.
+- **Actionable Diagnostic Trees**: Permission or API Key issues now display clear status messages (e.g., `🔑 No API key saved` or `❌ Missing scope: databases.read`) directly on tree items instead of empty states.
 
-AppForge now fully supports self-hosted Appwrite deployments alongside Appwrite Cloud.
+### ✅ Production Reliability Audit & Fixes
+
+This release focuses on production stability and architecture hardening across Cloud and Self-Hosted Appwrite deployments.
 
 Improvements include:
 
-- Better endpoint validation
-- Database discovery fixes
-- Collection loading reliability
-- Improved compatibility across Appwrite versions
-- Enhanced diagnostics for self-hosted instances
+- Database loading pipeline fixes from SDK response to Tree View rendering
+- Robust Appwrite response parsing with explicit list-key extraction
+- Persistent credential and active-project restoration improvements
+- Endpoint normalization for Cloud/Self-Hosted compatibility (`/v1`)
+- Structured diagnostics for loading, parsing, and rendering
 
-This resolves the issue where some self-hosted users could connect successfully but resources would not appear in the explorer.
+### 📋 UX Improvements
+- Added **Copy ID** context action for Project, Database, Collection/Table, Document, Function, Bucket, and File nodes
+- Clipboard writes now show confirmation toasts for consistent feedback
 
 **Experimental Features**:
 
@@ -185,7 +194,7 @@ This release focuses on making Appwrite resources fully visible and queryable fr
 
 ## Architecture
 
-# 🏗 New Architecture (v0.2.1-alpha)
+# 🏗 Architecture (v0.2.2-alpha)
 
 AppForge now includes a modern internal architecture designed for scalability and realtime operations.
 
@@ -360,13 +369,11 @@ src/
 
 AppForge v0.2.0-alpha completes the core resource exploration surface for Databases, Functions, and Storage. The roadmap beyond v0.2.0 is focused on operational confidence and multi-project automation.
 
-### v0.2.1-alpha (Stabilization & Logs)
-
-- Logs Viewer feature completion with filtering and export
-- Function execution logs viewer
-- Improved error messages for common failure modes
-- Performance optimization for large databases and function counts
-- API response caching for frequently-accessed resources
+### v0.2.2-alpha (Production Audit & Stability)
+- End-to-end database loading fix
+- Persistent credential and active-project restoration improvements
+- Copy ID actions across major resources
+- Lifecycle/disposal hardening for tree and status subscriptions
 
 ### v0.3.0-alpha (Operations & Automation)
 
@@ -405,8 +412,10 @@ If you are proposing a larger workflow or architecture change, include the reaso
 
 ## Documentation
 
+## Documentation
+
 - Release notes: [CHANGELOG.md](./CHANGELOG.md)
-- v0.2.1-alpha release report: [RELEASE_REPORT_v0.2.1-alpha.md](./RELEASE_REPORT_v0.2.1-alpha.md)
+- v0.2.2-alpha release report: [RELEASE_REPORT_v0.2.2-alpha.md](./RELEASE_REPORT_v0.2.2-alpha.md)
 - Folder layout reference: [FOLDER_STRUCTURE.md](./FOLDER_STRUCTURE.md)
 
 ## Troubleshooting
