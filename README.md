@@ -154,6 +154,7 @@ It solves the problems that usually show up in real Appwrite workflows:
 - `AppForge: View Function Logs`
 - `AppForge: Check Project Status`
 - `AppForge: View Connection Info`
+- `AppForge: View Database` (Opens Interactive Webview Data Viewer)
 - `AppForge: Troubleshoot Empty Databases`
 - `AppForge: Verify Appwrite Project Environment`
 - `AppForge: Run Diagnostics`
@@ -163,10 +164,10 @@ It solves the problems that usually show up in real Appwrite workflows:
 
 ### 🗄️ Multi-Project Database Discovery & Webview Viewer
 
-- **Isolated Project Clients**: Each saved project node now runs requests on an isolated SDK client instance, preventing API key/project ID cross-contamination across workspaces.
-- **Appwrite Server v27+ Parity**: Native detection and extraction support for `TablesDB` and standard `Databases` API responses.
-- **Interactive Database Viewer**: Click on any collection or table node in the sidebar to open the full-screen editor tab displaying document rows, column attributes, system fields (`$id`, `$createdAt`), real-time search filtering, and document actions.
-- **Actionable Diagnostic Trees**: Permission or API Key issues now display clear status messages (e.g., `🔑 No API key saved` or `❌ Missing scope: databases.read`) directly on the tree node.
+- **Unified TablesDB Discovery**: Modernized primary database queries to `tablesDB.list()` (`GET /tablesdb`) with an automatic fallback to `Databases.list()` (`GET /databases`). Guarantees 100% database and table discovery across all Appwrite versions (1.5.x, 1.7.x, 27.x+, and Cloud).
+- **Isolated Project Clients**: Each saved project node runs requests on an isolated SDK client instance (`AppwriteClientService.createForProject`), preventing API key/project ID cross-contamination across multi-project workspaces.
+- **Interactive Database Viewer**: Click on any collection or table node in the sidebar tree to open a full-screen editor tab displaying document rows, dynamic column attributes, system fields (`$id`, `$createdAt`), real-time search filtering, document viewing, and deletion.
+- **Actionable Diagnostic Trees**: Permission or API Key issues now display clear status messages (e.g., `🔑 No API key saved` or `❌ Missing scope: databases.read`) directly on tree items instead of empty states.
 
 ### ✅ Production Reliability Audit & Fixes
 

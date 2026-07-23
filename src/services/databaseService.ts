@@ -1,6 +1,6 @@
 /**
  * Database Service
- * Handles database & collection discovery per-project context
+ * Handles database & collection/table discovery via TablesDB unified endpoints
  */
 import {
   DatabaseItem,
@@ -20,12 +20,11 @@ export class DatabaseService {
     private project: AppwriteProject,
     private apiKey: string,
   ) {
-    // Explicitly create an isolated client instance using this project's endpoint, ID, and key
     this.clientService = AppwriteClientService.createForProject(this.project, this.apiKey);
   }
 
   /**
-   * Universal parser for legacy and v27 TablesDB API responses
+   * Universal response parser for TablesDB (/tablesdb) and Databases (/databases) payloads
    */
   private extractItems(response: any): any[] {
     if (!response) return [];
@@ -34,32 +33,45 @@ export class DatabaseService {
     if (Array.isArray(response.tables)) return response.tables;
     if (Array.isArray(response.collections)) return response.collections;
     if (Array.isArray(response.documents)) return response.documents;
+    if (Array.isArray(response.rows)) return response.rows;
     return [];
   }
 
   /**
-   * List all databases for the project
+   * List all databases for the project using TablesDB primary endpoint (GET /tablesdb via tablesDB.list())
    */
   async listDatabases(): Promise<DatabaseItem[]> {
     try {
-      const dbClient = this.clientService.getDatabasesService();
       const tablesDB = this.clientService.getTablesDBService();
+      const dbClient = this.clientService.getDatabasesService();
 
       let response: any;
 
-      // Check for v27 TablesDB list method first, fall back to standard list
-      if (typeof (tablesDB as any).listDatabases === "function") {
-        response = await (tablesDB as any).listDatabases();
+      // 1. Primary: Use tablesDB.list() -> Hits GET /tablesdb which returns ALL databases
+      if (tablesDB && typeof tablesDB.list === "function") {
+        try {
+          response = await tablesDB.list();
+        } catch (tablesDbError) {
+          outputChannel.warn(
+            "DATABASES",
+            `TablesDB list failed, falling back to legacy Databases API for project [${this.project.projectId}]`
+          );
+          response = await dbClient.list();
+        }
       } else {
         response = await dbClient.list();
       }
 
       const databases = this.extractItems(response);
 
-      outputChannel.info("DATABASES", "Databases payload received successfully", {
-        projectId: this.project.projectId,
-        count: databases.length,
-      });
+      outputChannel.info(
+        "DATABASES",
+        `Fetched ${databases.length} database(s) for project [${this.project.projectId}]`,
+        {
+          projectId: this.project.projectId,
+          total: response?.total ?? databases.length,
+        }
+      );
 
       return databases.map((db: any) => ({
         $id: String(db.$id ?? db.id ?? db.databaseId ?? ""),
@@ -71,23 +83,32 @@ export class DatabaseService {
         `Failed to list databases for project [${this.project.projectId}]`,
         error as Error,
       );
-      // RE-THROW error so the TreeDataProvider displays a diagnostic node instead of swallowing to []
       throw error;
     }
   }
 
   /**
-   * List collections in a database
+   * List collections / tables inside a database
    */
   async listCollections(databaseId: string): Promise<CollectionItem[]> {
     try {
-      const dbClient = this.clientService.getDatabasesService();
       const tablesDB = this.clientService.getTablesDBService();
+      const dbClient = this.clientService.getDatabasesService();
 
       let response: any;
 
-      if (typeof (tablesDB as any).listTables === "function") {
-        response = await (tablesDB as any).listTables({ databaseId });
+      // Primary: query TablesDB listTables (GET /tablesdb/{databaseId}/tables)
+      if (tablesDB && typeof tablesDB.listTables === "function") {
+        try {
+          // Supports positional databaseId or object parameter signature
+          response = await (tablesDB as any).listTables(databaseId);
+        } catch {
+          try {
+            response = await (tablesDB as any).listTables({ databaseId });
+          } catch {
+            response = await dbClient.listCollections(databaseId);
+          }
+        }
       } else {
         response = await dbClient.listCollections(databaseId);
       }
@@ -95,20 +116,23 @@ export class DatabaseService {
       const collections = this.extractItems(response);
 
       return collections.map((col: any) => ({
-        $id: String(col.$id ?? col.id ?? col.collectionId ?? ""),
+        $id: String(col.$id ?? col.id ?? col.tableId ?? col.collectionId ?? ""),
         name: String(col.name ?? col.$id ?? col.id ?? "Unnamed Collection"),
         $databaseId: String(col.$databaseId || databaseId),
       }));
     } catch (error) {
       outputChannel.error(
         "DATABASES",
-        `Failed to list collections for database [${databaseId}]`,
+        `Failed to list collections/tables for Database ID: ${databaseId}`,
         error as Error,
       );
       throw error;
     }
   }
 
+  /**
+   * Get collection / table details including attributes and indexes
+   */
   async getCollectionDetails(
     databaseId: string,
     collectionId: string,
@@ -142,11 +166,7 @@ export class DatabaseService {
         })),
       };
     } catch (error) {
-      outputChannel.error(
-        "DATABASES",
-        "Failed to get collection details",
-        error as Error,
-      );
+      outputChannel.error("DATABASES", "Failed to get collection details", error as Error);
       return {
         collection: { $id: collectionId, name: "", $databaseId: databaseId },
         attributes: [],
@@ -155,6 +175,9 @@ export class DatabaseService {
     }
   }
 
+  /**
+   * List documents / rows
+   */
   async listDocuments(
     databaseId: string,
     collectionId: string,

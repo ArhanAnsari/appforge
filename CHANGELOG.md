@@ -1,103 +1,94 @@
-# AppForge v0.2.1-alpha
+# Changelog
 
-## 🚀 What's New
+All notable changes to the **AppForge** VS Code extension will be documented in this file.
 
-### Self-Hosted Appwrite Support
-
-AppForge now properly supports self-hosted Appwrite instances alongside Appwrite Cloud.
-
-#### Improvements
-
-* Fixed database discovery issues on self-hosted Appwrite deployments
-* Improved endpoint handling and validation
-* Better compatibility across different Appwrite versions
-* Enhanced project connection reliability
-
-### Status Bar Improvements
-
-* Added live active project display in the VS Code status bar
-* Automatic updates when switching projects
-* Improved project visibility across workspaces
-
-### Intelligent Refresh System
-
-* Introduced centralized Refresh Manager
-* Debounced refresh requests to prevent excessive API calls
-* Scoped resource refreshing
-* Improved resource synchronization after operations
-
-### Event-Driven Architecture
-
-* Added lightweight Event Bus system
-* Real-time communication between extension modules
-* Improved extension responsiveness
-* Better state management
-
-### Professional Logging & Telemetry
-
-* Added dedicated AppForge Output Channel
-* Structured logging system
-* Operation tracking and diagnostics
-* Performance telemetry collection
-
-### Function Logs Enhancements
-
-* Improved function execution monitoring
-* Better log retrieval and presentation
-* Enhanced diagnostics for failed executions
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## 🛠️ Fixes
+## [0.2.2-alpha] - July 2026
 
-### Fixed
+### 🚀 Major Improvements & Features
 
-* Fixed self-hosted Appwrite database loading issues
-* Fixed project synchronization inconsistencies
-* Fixed refresh reliability after resource operations
-* Fixed status bar update inconsistencies
-* Improved error handling across multiple commands
-* Improved extension initialization stability
+* **Unified Database Discovery (`TablesDB.list`)**:
+  * Upgraded primary database queries to `tablesDB.list()` (`GET /tablesdb`) with an automatic fallback to `Databases.list()` (`GET /databases`).
+  * Resolves empty database list issues across older Appwrite instances (e.g., 1.7.4+) and modern Appwrite v27+ server deployments.
 
-### Internal Improvements
+* **Multi-Project Credential Isolation**:
+  * Introduced `AppwriteClientService.createForProject()` to instantiate project-isolated SDK client instances dynamically.
+  * Eliminates cross-project API key and endpoint leakage when navigating multiple projects in the sidebar.
 
-* Added Refresh Manager architecture
-* Added Event Bus infrastructure
-* Added Output Channel manager
-* Improved service separation and maintainability
-* Enhanced debugging capabilities
+* **Interactive Database Viewer Panel**:
+  * Bound the `appforge.viewDatabase` command directly to collection and table tree nodes.
+  * Clicking any collection or table node now opens a dedicated webview tab showing document rows, dynamic attribute columns, system metadata (`$id`, `$createdAt`), and action controls.
 
----
+* **Explicit Diagnostic Tree Items**:
+  * Replaced silent empty array fallbacks with actionable diagnostic status nodes (e.g., `🔑 No API key saved`, `❌ Missing Scope: databases.read`) directly in the Tree View.
 
-## 📊 Technical Highlights
+### 🛠️ Bug Fixes & Codebase Hardening
 
-### New Core Systems
-
-* Event Bus
-* Refresh Manager
-* Output Channel Manager
-* Enhanced Telemetry Integration
-* Improved Status Bar Service
-
-### Performance
-
-* Reduced redundant refresh operations
-* Better resource loading workflow
-* Improved command execution tracking
-* More efficient state updates
+* **Type Safety & Node16/NodeNext Support**:
+  * Appended explicit `.js` extensions to dynamic `import()` calls across service loaders, resolving ECMAScript module resolution warnings.
+  * Removed implicit `any` usage in callbacks and functions across the database commands and tree provider layers.
+* **Webview Lifecycle Management**:
+  * Added panel key tracking (`activeViewerPanels`) to prevent duplicate Webview instances from opening when clicking the same collection repeatedly.
 
 ---
 
-## 🔄 Upgrade Notes
+## [0.2.1-alpha] - June 2026
 
-Existing users can safely upgrade from v0.2.0-alpha.
+### 🚀 What's New
 
-No project migration is required.
+* **Self-Hosted Appwrite Support**:
+  * Proper support for self-hosted Appwrite instances alongside Appwrite Cloud.
+  * Improved endpoint validation and URL normalization (`/v1` path formatting).
 
-If you previously experienced issues with self-hosted Appwrite projects, reconnect your project after upgrading to ensure all resources are refreshed correctly.
+* **Status Bar Improvements**:
+  * Added live active project display in the VS Code status bar.
+  * Instant automatic updates when switching active workspace context.
+
+* **Intelligent Refresh System**:
+  * Introduced centralized `RefreshManager` to queue and debounce tree refresh events.
+  * Prevents duplicate execution requests and network race conditions during fast updates.
+
+* **Event-Driven Architecture**:
+  * Added lightweight `EventBus` infrastructure for decoupled module-to-module event broadcasting.
+
+* **Professional Logging & Telemetry**:
+  * Added dedicated `AppForge` Output Channel for structured operation tracing (`[TREE]`, `[DATABASES]`, `[STORAGE]`).
+
+### 🛠️ Fixes
+
+* Fixed database discovery failures on local Docker and custom domain deployments.
+* Resolved project synchronization inconsistencies across VS Code window restarts.
+* Improved error reporting for failed function log retrievals.
 
 ---
 
-## ❤️ Thanks
+## [0.2.0-alpha] - May 2026
 
-Special thanks to the Appwrite community members who reported issues related to self-hosted deployments and resource synchronization. Your feedback directly helped improve AppForge v0.2.1-alpha.
+### 🚀 What's New
+
+* **Multi-Project Management**:
+  * Store and manage multiple Appwrite projects using VS Code `SecretStorage`.
+  * Added project context switching capabilities from sidebar and command palette.
+
+* **Functions Explorer**:
+  * Browse functions, inspect deployment history, and view environment variables.
+  * Execute functions directly from the VS Code sidebar.
+
+* **Storage Explorer**:
+  * Browse storage buckets, inspect file sizes, and view file details.
+
+* **Copy ID Actions**:
+  * Context menu action to quickly copy Project, Database, Collection, Document, Bucket, and Function IDs to clipboard.
+
+---
+
+## [0.1.0-alpha] - April 2026
+
+### 🚀 Initial Alpha Release
+
+* Initial prototype of the AppForge extension for VS Code.
+* Basic connection support for Appwrite projects via API Key.
+* Basic sidebar rendering for Databases, Collections, and Documents.

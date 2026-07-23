@@ -1,19 +1,16 @@
 /**
  * AppForge Tree Data Provider
- * Manages the tree view in the sidebar for Projects, Databases, Functions, and Logs
+ * Manages the tree view in the sidebar for Projects, Databases, Functions, and Storage
  */
 
 import * as vscode from "vscode";
-import * as path from "path";
-import { TreeItemData, StoredProject } from "../types";
+import { TreeItemData } from "../types";
 import { ProjectStorageService } from "../services/projectStorageService";
 import { AppwriteClientService } from "../services/appwriteClientService";
 import { logger } from "../utils/logger";
 import { outputChannel } from "../core/output/outputChannel";
 import { refreshManager } from "../core/refresh/refreshManager";
-import { extractObjectArrayWithId } from "../utils/responseParser";
 import { DatabaseService } from "../services/databaseService";
-import { DatabaseItem, CollectionItem } from "../types";
 
 /**
  * Tree item for the AppForge sidebar
@@ -33,7 +30,6 @@ export class AppForgeTreeItem extends vscode.TreeItem {
       id: this.id,
     });
 
-    // Set icons based on type
     this.setIconAndCommand();
   }
 
@@ -97,7 +93,6 @@ export class AppForgeTreeItem extends vscode.TreeItem {
   }
 
   private setIconAndCommand(): void {
-    // Use custom icon for root, theme icons for others
     if (this.data.type === "root" && this.extensionUri) {
       this.iconPath = vscode.Uri.joinPath(
         this.extensionUri,
@@ -109,7 +104,6 @@ export class AppForgeTreeItem extends vscode.TreeItem {
       this.iconPath = new vscode.ThemeIcon(iconName);
     }
 
-    // Add context value for conditional menus
     this.contextValue = this.data.type;
 
     if (this.data.type === "project") {
@@ -205,10 +199,6 @@ export class AppForgeTreeDataProvider
   private refreshUnsubscribe?: () => void;
   private loadingUnsubscribe?: () => void;
 
-  /**
-   * Attach the TreeView instance so we can listen to expand/collapse and
-   * subscribe to refresh manager events for live updates.
-   */
   public attachView(view: vscode.TreeView<AppForgeTreeItem>): void {
     this.view = view;
     this.viewDisposables.forEach((disposable) => disposable.dispose());
@@ -218,7 +208,6 @@ export class AppForgeTreeDataProvider
     this.refreshUnsubscribe = undefined;
     this.loadingUnsubscribe = undefined;
 
-    // Track expansion state
     this.viewDisposables.push(
       view.onDidExpandElement((e) => {
         const id = e.element?.id;
@@ -236,7 +225,6 @@ export class AppForgeTreeDataProvider
       }),
     );
 
-    // Subscribe to refresh manager events
     this.refreshUnsubscribe = refreshManager.onRefresh((request) => {
       try {
         const key = `scope:${request.scope}:${request.nodeId || ""}`;
@@ -276,9 +264,6 @@ export class AppForgeTreeDataProvider
     );
   }
 
-  /**
-   * Refresh the tree view
-   */
   public refresh(): void {
     this._onDidChangeTreeData.fire(null);
   }
@@ -301,9 +286,6 @@ export class AppForgeTreeDataProvider
     return element;
   }
 
-  /**
-   * Get children for a tree item
-   */
   public async getChildren(
     element?: AppForgeTreeItem,
   ): Promise<AppForgeTreeItem[]> {
@@ -315,134 +297,64 @@ export class AppForgeTreeDataProvider
         projectId: element?.data.projectId,
       });
 
-      // Root level - show Projects, Databases, Functions, Logs
       if (!element) {
-        const rootChildren = this.getRootChildren();
-        outputChannel.debug("TREE", "Returning root children", {
-          count: rootChildren.length,
-          childIds: rootChildren.map((child) => child.id),
-        });
-        return rootChildren;
+        return this.getRootChildren();
       }
 
-      // Project level
       if (element.data.type === "project") {
-        const projectChildren = this.getProjectChildren(element);
-        outputChannel.debug("TREE", "Returning project children", {
-          projectId: element.data.id,
-          count: projectChildren.length,
-          childIds: projectChildren.map((child) => child.id),
-        });
-        return projectChildren;
+        return this.getProjectChildren(element);
       }
 
-      // Databases section
       if (element.data.type === "databases") {
-        const databaseChildren = await this.getDatabasesChildren(element);
-        outputChannel.debug("TREE", "Returning database children", {
-          projectId: element.data.projectId,
-          count: databaseChildren.length,
-          childIds: databaseChildren.map((child) => child.id),
-        });
-        return databaseChildren;
+        return await this.getDatabasesChildren(element);
       }
 
-      // Database children (collections)
       if (element.data.type === "database") {
-        const collectionChildren =
-          await this.getDatabaseCollectionsChildren(element);
-        outputChannel.debug("TREE", "Returning collection children", {
-          projectId: element.data.projectId,
-          databaseId: element.data.id,
-          count: collectionChildren.length,
-          childIds: collectionChildren.map((child) => child.id),
-        });
-        return collectionChildren;
+        return await this.getDatabaseCollectionsChildren(element);
       }
 
-      // Collection children (attributes, indexes, documents)
       if (element.data.type === "collection") {
-        const collectionDetailsChildren =
-          await this.getCollectionDetailsChildren(element);
-        outputChannel.debug("TREE", "Returning collection details children", {
-          projectId: element.data.projectId,
-          collectionId: element.data.id,
-          count: collectionDetailsChildren.length,
-          childIds: collectionDetailsChildren.map((child) => child.id),
-        });
-        return collectionDetailsChildren;
+        return await this.getCollectionDetailsChildren(element);
       }
 
-      // Attributes children
       if (element.data.type === "attributes") {
-        const attributeChildren = await this.getAttributesChildren(element);
-        return attributeChildren;
+        return await this.getAttributesChildren(element);
       }
 
-      // Indexes children
       if (element.data.type === "indexes") {
-        const indexChildren = await this.getIndexesChildren(element);
-        return indexChildren;
+        return await this.getIndexesChildren(element);
       }
 
-      // Documents children
       if (element.data.type === "documents") {
-        const documentChildren = await this.getDocumentsChildren(element);
-        return documentChildren;
+        return await this.getDocumentsChildren(element);
       }
 
-      // Functions section
       if (element.data.type === "functions") {
-        const functionChildren = await this.getFunctionsChildren(element);
-        outputChannel.debug("TREE", "Returning function children", {
-          projectId: element.data.projectId,
-          count: functionChildren.length,
-          childIds: functionChildren.map((child) => child.id),
-        });
-        return functionChildren;
+        return await this.getFunctionsChildren(element);
       }
 
-      // Function children (deployments, executions, variables)
       if (element.data.type === "function") {
-        const functionDetailsChildren =
-          await this.getFunctionDetailsChildren(element);
-        return functionDetailsChildren;
+        return await this.getFunctionDetailsChildren(element);
       }
 
-      // Deployments children
       if (element.data.type === "deployments") {
-        const deploymentChildren = await this.getDeploymentsChildren(element);
-        return deploymentChildren;
+        return await this.getDeploymentsChildren(element);
       }
 
-      // Executions children
       if (element.data.type === "executions") {
-        const executionChildren = await this.getExecutionsChildren(element);
-        return executionChildren;
+        return await this.getExecutionsChildren(element);
       }
 
-      // Variables children
       if (element.data.type === "variables") {
-        const variableChildren = await this.getVariablesChildren(element);
-        return variableChildren;
+        return await this.getVariablesChildren(element);
       }
 
-      // Storage/Buckets section
       if (element.data.type === "buckets") {
-        const bucketChildren = await this.getBucketsChildren(element);
-        return bucketChildren;
+        return await this.getBucketsChildren(element);
       }
 
-      // Bucket children (files)
-      if (element.data.type === "bucket") {
-        const fileChildren = await this.getFilesChildren(element);
-        return fileChildren;
-      }
-
-      // Files children
-      if (element.data.type === "files") {
-        const fileChildren = await this.getFilesChildren(element);
-        return fileChildren;
+      if (element.data.type === "bucket" || element.data.type === "files") {
+        return await this.getFilesChildren(element);
       }
 
       return [];
@@ -714,7 +626,6 @@ export class AppForgeTreeDataProvider
           treeId: `databases:${projectId}:load-error`,
         };
 
-        // Render explicit error message instead of falling back to "No databases yet"
         return [
           new AppForgeTreeItem(
             `❌ ${errorMessage}`,
@@ -779,8 +690,6 @@ export class AppForgeTreeDataProvider
           ];
         }
 
-        // Inside getDatabaseCollectionsChildren in treeDataProvider.ts
-
         collections.forEach((col: any) => {
           const id = col.$id || col.id || col.collectionId || col.name;
           const name = col.name || col.$id || col.id;
@@ -798,12 +707,12 @@ export class AppForgeTreeDataProvider
 
           const item = new AppForgeTreeItem(
             loading ? `${name} ⏳` : name,
-            vscode.TreeItemCollapsibleState.Collapsed, // Can expand to see Attributes/Documents
+            vscode.TreeItemCollapsibleState.Collapsed,
             colData,
             this.extensionUri,
           );
 
-          // ATTACH THE COMMAND TO OPEN THE DATABASE VIEWER WEBVIEW
+          // ATTACH COMMAND TO OPEN DATABASE VIEWER ON CLICK
           item.command = {
             command: "appforge.viewDatabase",
             title: "View Database",
@@ -1368,7 +1277,7 @@ export class AppForgeTreeDataProvider
       }
 
       return executions.slice(0, 50).map(
-        (exec) =>
+        (exec: any) =>
           new AppForgeTreeItem(
             `⚡ ${exec.status} (${exec.duration}ms)`,
             vscode.TreeItemCollapsibleState.None,
