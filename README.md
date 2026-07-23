@@ -412,9 +412,10 @@ If you are proposing a larger workflow or architecture change, include the reaso
 
 ## Documentation
 
+## Documentation
+
 - Release notes: [CHANGELOG.md](./CHANGELOG.md)
 - v0.2.2-alpha release report: [RELEASE_REPORT_v0.2.2-alpha.md](./RELEASE_REPORT_v0.2.2-alpha.md)
-- v0.2.1-alpha release report: [RELEASE_REPORT_v0.2.1-alpha.md](./RELEASE_REPORT_v0.2.1-alpha.md)
 - Folder layout reference: [FOLDER_STRUCTURE.md](./FOLDER_STRUCTURE.md)
 
 ## Troubleshooting
