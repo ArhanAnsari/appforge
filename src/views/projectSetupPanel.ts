@@ -103,7 +103,7 @@ export class ProjectSetupPanel {
     }
   }
 
-  private async _testConnection(
+ private async _testConnection(
     endpoint: string,
     projectId: string,
     apiKey: string,
@@ -122,7 +122,11 @@ export class ProjectSetupPanel {
         return;
       }
 
-      const tempClient = AppwriteClientService.getInstance();
+      const tempClient = AppwriteClientService.createInstance(
+        endpoint,
+        projectId,
+        apiKey
+      );
       const databases = tempClient.createDatabasesService(
         {
           projectName: "Test",

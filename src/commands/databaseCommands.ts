@@ -5,7 +5,7 @@
 
 import * as vscode from "vscode";
 import { AppwriteClientService } from "../services/appwriteClientService";
-import { AppForgeTreeDataProvider } from "../providers/treeDataProvider";
+import { AppForgeTreeDataProvider, AppForgeTreeItem } from "../providers/treeDataProvider";
 import { ProjectStorageService } from "../services/projectStorageService";
 import { ID, Query } from "node-appwrite";
 import { EventBus } from "../core/events/eventBus";
@@ -24,7 +24,6 @@ export function registerDatabaseCommands(
   // Refresh Databases
   context.subscriptions.push(
     vscode.commands.registerCommand("appforge.refreshDatabases", async () => {
-      // Use RefreshManager to orchestrate a debounced scoped refresh
       refreshManager.queueRefresh("databases");
       outputChannel.success("DATABASE", "Databases refresh queued");
       await EventBus.getInstance().emit("refresh.requested", {
@@ -43,7 +42,6 @@ export function registerDatabaseCommands(
     vscode.commands.registerCommand(
       "appforge.createDocument",
       async (arg: any, arg2?: any) => {
-        // Handle both tree item context and direct parameters
         let collectionId: string, databaseId: string;
         if (typeof arg === "string") {
           collectionId = arg;
@@ -69,7 +67,6 @@ export function registerDatabaseCommands(
     vscode.commands.registerCommand(
       "appforge.listDocuments",
       async (arg: any, arg2?: any) => {
-        // Handle both tree item context and direct parameters
         let collectionId: string, databaseId: string;
         if (typeof arg === "string") {
           collectionId = arg;
@@ -168,7 +165,6 @@ async function createDocumentCommand(
 
     const { project, apiKey, projectId: resolvedProjectId } = projectContext;
 
-    // Get JSON input from user
     const jsonInput = await vscode.window.showInputBox({
       placeHolder: '{ "field1": "value1", "field2": "value2" }',
       prompt: "Enter document data as JSON",
@@ -205,7 +201,6 @@ async function createDocumentCommand(
       async () => {
         try {
           const nodeKey = `col:${resolvedProjectId}:${databaseId}:${collectionId}`;
-          // optimistic loading indicator
           refreshManager.notifyLoadingChange(nodeKey, true);
           const start = Date.now();
           const databases = appwriteClient.createDatabasesService(
@@ -228,7 +223,6 @@ async function createDocumentCommand(
             timestamp: Date.now(),
           });
 
-          // mark node refreshed and request a scoped refresh
           refreshManager.markRefreshed(nodeKey);
           refreshManager.notifyLoadingChange(nodeKey, false);
           refreshManager.queueRefresh("specific", nodeKey);
@@ -259,7 +253,6 @@ async function createDocumentCommand(
             success: false,
             duration: 0,
           });
-          // clear loading state on failure
           try {
             const nodeKey = `col:${resolvedProjectId}:${databaseId}:${collectionId}`;
             refreshManager.notifyLoadingChange(nodeKey, false);
@@ -432,7 +425,7 @@ async function listDocumentsCommand(
             { collectionId },
             Date.now() - start,
           );
-          // mark refreshed and clear loading
+
           refreshManager.markRefreshed(nodeKey);
           refreshManager.notifyLoadingChange(nodeKey, false);
           refreshManager.queueRefresh("specific", nodeKey);
@@ -497,7 +490,6 @@ async function updateDocumentCommand(
 
     const { project, apiKey, projectId: resolvedProjectId } = projectContext;
 
-    // First fetch the current document
     let currentDoc: Record<string, unknown> | null = null;
     await vscode.window.withProgress(
       {
@@ -530,7 +522,6 @@ async function updateDocumentCommand(
       return;
     }
 
-    // Show current data and get new data
     const currentJson = JSON.stringify(currentDoc, null, 2);
     const jsonInput = await vscode.window.showInputBox({
       value: currentJson,

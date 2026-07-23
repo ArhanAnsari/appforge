@@ -43,9 +43,22 @@ export function activate(context: vscode.ExtensionContext) {
   try {
     // Initialize core structural lifecycle services
     const projectStorage = new ProjectStorageService(context, context.secrets);
-    const appwriteClient = AppwriteClientService.getInstance();
-    const statusBar = new StatusBarService(projectStorage);
+    
+    // Auto-load active project sequence on startup execution before retrieving client instance
+    loadActiveProjectOnActivation(projectStorage);
 
+    // Guaranteed fallback or initialized singleton instance
+    let appwriteClient = AppwriteClientService.getInstance();
+    if (!appwriteClient) {
+      // Create a default instance to guarantee non-null reference for command handlers
+      appwriteClient = AppwriteClientService.createInstance(
+        "https://cloud.appwrite.io/v1",
+        "default",
+        ""
+      );
+    }
+
+    const statusBar = new StatusBarService(projectStorage);
     statusBar.show();
 
     const treeDataProvider = new AppForgeTreeDataProvider(
@@ -61,13 +74,12 @@ export function activate(context: vscode.ExtensionContext) {
     });
     treeDataProvider.attachView(treeView);
 
-    // CRITICAL SAFEGUARD: Push visual components into subscriptions array
-    // IMMEDIATELY so VS Code can auto-dispose them if anything fails downstream
+    // Push visual components into subscriptions array immediately
     context.subscriptions.push(statusBar);
     context.subscriptions.push(treeDataProvider);
     context.subscriptions.push(treeView);
 
-    // Register each command block EXACTLY ONCE
+    // Register each command block using the non-null appwriteClient
     registerProjectCommands(
       context,
       projectStorage,
@@ -119,9 +131,6 @@ export function activate(context: vscode.ExtensionContext) {
       treeDataProvider,
     );
 
-    // Auto-load active project sequence on startup execution
-    loadActiveProjectOnActivation(projectStorage);
-
     logger.success("EXTENSION", "✓ AppForge initialized successfully");
     outputChannel.success("EXTENSION", "AppForge initialized successfully");
   } catch (error) {
@@ -145,6 +154,11 @@ async function loadActiveProjectOnActivation(
   try {
     const projectWithKey = await projectStorage.getActiveProjectWithApiKey();
     if (projectWithKey) {
+      AppwriteClientService.createInstance(
+        projectWithKey.endpoint,
+        projectWithKey.projectId,
+        projectWithKey.apiKey
+      );
       logger.success(
         "EXTENSION",
         `✓ Loaded active project: ${projectWithKey.projectName}`,

@@ -1,103 +1,80 @@
-/**
- * Appwrite Client Service
- * Singleton service that manages the Appwrite client lifecycle and connections
- */
+import { Client, TablesDB, Databases, Functions, Storage, Account } from 'node-appwrite';
 
-import {
-  Client,
-  Databases,
-  Functions,
-  Account,
-  Storage,
-  Teams,
-} from "node-appwrite";
-import { AppwriteProject } from "../types";
-
-/**
- * Stateless factory for creating project-scoped Appwrite clients and services.
- */
 export class AppwriteClientService {
-  private static instance: AppwriteClientService;
+    private static instance: AppwriteClientService | undefined;
 
-  private constructor() {}
+    private client: Client;
+    private tablesDB: TablesDB;
+    private databases: Databases;
+    private functions: Functions;
+    private storage: Storage;
+    private account: Account;
 
-  /**
-   * Get singleton instance
-   */
-  public static getInstance(): AppwriteClientService {
-    if (!AppwriteClientService.instance) {
-      AppwriteClientService.instance = new AppwriteClientService();
+    constructor(endpoint: string, projectId: string, apiKey: string) {
+        console.log(`[AppForge Client] Binding client for Project: ${projectId}`);
+
+        let cleanEndpoint = endpoint.trim();
+        if (!cleanEndpoint.endsWith('/v1')) {
+            cleanEndpoint = cleanEndpoint.replace(/\/+$/, '') + '/v1';
+        }
+
+        this.client = new Client()
+            .setEndpoint(cleanEndpoint)
+            .setProject(projectId)
+            .setKey(apiKey);
+
+        this.tablesDB = new TablesDB(this.client);
+        this.databases = new Databases(this.client);
+        this.functions = new Functions(this.client);
+        this.storage = new Storage(this.client);
+        this.account = new Account(this.client);
     }
-    return AppwriteClientService.instance;
-  }
 
-  /**
-   * Create a new Appwrite client scoped to a single project.
-   */
-  public getProjectScopedClient(
-    project: AppwriteProject,
-    apiKey: string,
-  ): Client {
-    const endpoint = this.normalizeEndpoint(project.endpoint);
-    return new Client()
-      .setEndpoint(endpoint)
-      .setProject(project.projectId)
-      .setKey(apiKey);
-  }
-
-  /**
-   * Create a project-scoped Databases service.
-   */
-  public createDatabasesService(
-    project: AppwriteProject,
-    apiKey: string,
-  ): Databases {
-    return new Databases(this.getProjectScopedClient(project, apiKey));
-  }
-
-  /**
-   * Create a project-scoped Functions service.
-   */
-  public createFunctionsService(
-    project: AppwriteProject,
-    apiKey: string,
-  ): Functions {
-    return new Functions(this.getProjectScopedClient(project, apiKey));
-  }
-
-  /**
-   * Create a project-scoped Account service.
-   */
-  public createAccountService(
-    project: AppwriteProject,
-    apiKey: string,
-  ): Account {
-    return new Account(this.getProjectScopedClient(project, apiKey));
-  }
-
-  /**
-   * Create a project-scoped Storage service.
-   */
-  public createStorageService(
-    project: AppwriteProject,
-    apiKey: string,
-  ): Storage {
-    return new Storage(this.getProjectScopedClient(project, apiKey));
-  }
-
-  /**
-   * Create a project-scoped Teams service.
-   */
-  public createTeamsService(project: AppwriteProject, apiKey: string): Teams {
-    return new Teams(this.getProjectScopedClient(project, apiKey));
-  }
-  private normalizeEndpoint(endpoint: string): string {
-    const trimmed = endpoint.trim().replace(/\/+$/, "");
-    if (trimmed.endsWith("/v1")) {
-      return trimmed;
+    // Static Instance Management
+    public static createInstance(endpoint: string, projectId: string, apiKey: string): AppwriteClientService {
+        AppwriteClientService.instance = new AppwriteClientService(endpoint, projectId, apiKey);
+        return AppwriteClientService.instance;
     }
-    return `${trimmed}/v1`;
-  }
+
+    public static getInstance(): AppwriteClientService | undefined {
+        return AppwriteClientService.instance;
+    }
+
+    public static resetInstance(): void {
+        AppwriteClientService.instance = undefined;
+    }
+
+    // Factory method to create isolated project clients dynamically
+    public static createForProject(project: { endpoint: string; projectId: string }, apiKey: string): AppwriteClientService {
+        return new AppwriteClientService(project.endpoint, project.projectId, apiKey);
+    }
+
+    // Getters & Service Accessors
+    public getClient(): Client { return this.client; }
+    public getTablesDBService(): TablesDB { return this.tablesDB; }
+    public getDatabasesService(..._args: any[]): Databases { return this.databases; }
+    public createDatabasesService(project?: any, apiKey?: string): Databases {
+        if (project?.endpoint && project?.projectId && apiKey) {
+            return new AppwriteClientService(project.endpoint, project.projectId, apiKey).getDatabasesService();
+        }
+        return this.databases;
+    }
+
+    public getFunctionsService(..._args: any[]): Functions { return this.functions; }
+    public createFunctionsService(project?: any, apiKey?: string): Functions {
+        if (project?.endpoint && project?.projectId && apiKey) {
+            return new AppwriteClientService(project.endpoint, project.projectId, apiKey).getFunctionsService();
+        }
+        return this.functions;
+    }
+
+    public getStorageService(..._args: any[]): Storage { return this.storage; }
+    public createStorageService(project?: any, apiKey?: string): Storage {
+        if (project?.endpoint && project?.projectId && apiKey) {
+            return new AppwriteClientService(project.endpoint, project.projectId, apiKey).getStorageService();
+        }
+        return this.storage;
+    }
+
+    public getAccountService(..._args: any[]): Account { return this.account; }
 }
-
-export const appwriteClientService = AppwriteClientService.getInstance();

@@ -47,6 +47,18 @@ Improvements include:
 
 ---
 
+## Multi-Project Credential Isolation & Database Discovery
+
+Fixed a critical issue where multi-project environments displayed `"No databases yet"` for secondary projects.
+
+### Changes Included:
+- **Project-Scoped SDK Clients**: Introduced `AppwriteClientService.createForProject()` to guarantee each tree request uses the specific project's endpoint, ID, and secret API Key instead of sharing a global singleton instance.
+- **Appwrite v27 `TablesDB` & Legacy API Compatibility**: Added response parsing (`extractItems`) supporting both new `TablesDB` payloads (`databases`, `tables`, `rows`) and legacy `Databases` service structures.
+- **Transparent Error Nodes**: Replaced silent error-swallowing in `databaseService.ts` with explicit diagnostic error tree items in `treeDataProvider.ts`.
+- **Database Viewer Panel Integration**: Attached `appforge.viewDatabase` command handlers directly to collection tree items, enabling double-click or click navigation to open the interactive Database Viewer webview tab.
+
+---
+
 ## Database Loading Pipeline Audit
 
 The database discovery system has been thoroughly audited.

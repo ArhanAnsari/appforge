@@ -5,7 +5,7 @@
 
 import { Storage } from "node-appwrite";
 import { BucketItem, FileItem, AppwriteProject } from "../types";
-import { appwriteClientService } from "./appwriteClientService";
+import { AppwriteClientService } from "./appwriteClientService";
 import { outputChannel } from "../core/output/outputChannel";
 import { extractObjectArrayWithId } from "../utils/responseParser";
 
@@ -15,22 +15,26 @@ export class StorageService {
     private apiKey: string,
   ) {}
 
+  private getClient(): Storage {
+    const instance = AppwriteClientService.getInstance();
+    if (!instance) {
+      throw new Error("Appwrite client instance is not initialized.");
+    }
+    return instance.createStorageService(this.project, this.apiKey);
+  }
+
   /**
    * List all storage buckets for the project
    */
   async listBuckets(): Promise<BucketItem[]> {
     try {
-      const storageClient = appwriteClientService.createStorageService(
-        this.project,
-        this.apiKey,
-      );
+      const storageClient = this.getClient();
       const response = await storageClient.listBuckets();
       const buckets = extractObjectArrayWithId(response);
 
       return buckets.map((bucket: any) => ({
         $id: bucket.$id,
         name: bucket.name,
-        // Appwrite returns a file count field depending on version; keep a safe fallback.
         filesCount: bucket.filesCount ?? bucket.filesTotal ?? bucket.files ?? 0,
         enabled: bucket.enabled,
       }));
@@ -49,10 +53,7 @@ export class StorageService {
    */
   async getBucket(bucketId: string): Promise<BucketItem> {
     try {
-      const storageClient = appwriteClientService.createStorageService(
-        this.project,
-        this.apiKey,
-      );
+      const storageClient = this.getClient();
       const bucket = await storageClient.getBucket(bucketId);
 
       outputChannel.info("[STORAGE] Raw bucket sample data:", JSON.stringify(bucket, null, 2));
@@ -73,15 +74,10 @@ export class StorageService {
    */
   async listFiles(bucketId: string, limit: number = 100): Promise<FileItem[]> {
     try {
-      const storageClient = appwriteClientService.createStorageService(
-        this.project,
-        this.apiKey,
-      );
-      // Note: Appwrite SDK v13 doesn't accept query strings, we'll limit in the response
+      const storageClient = this.getClient();
       const response = await storageClient.listFiles(bucketId);
       const files = extractObjectArrayWithId(response);
 
-      // Limit to specified number of files
       return files.slice(0, limit).map((file: any) => ({
         $id: file.$id,
         bucketId: bucketId,
@@ -100,10 +96,7 @@ export class StorageService {
    */
   async getFile(bucketId: string, fileId: string): Promise<FileItem> {
     try {
-      const storageClient = appwriteClientService.createStorageService(
-        this.project,
-        this.apiKey,
-      );
+      const storageClient = this.getClient();
       const file = await storageClient.getFile(bucketId, fileId);
 
       return {
@@ -124,10 +117,7 @@ export class StorageService {
    */
   async createBucket(bucketName: string): Promise<BucketItem> {
     try {
-      const storageClient = appwriteClientService.createStorageService(
-        this.project,
-        this.apiKey,
-      );
+      const storageClient = this.getClient();
       const bucket = await storageClient.createBucket(
         String(Math.random()),
         bucketName,
@@ -160,10 +150,7 @@ export class StorageService {
    */
   async deleteFile(bucketId: string, fileId: string): Promise<void> {
     try {
-      const storageClient = appwriteClientService.createStorageService(
-        this.project,
-        this.apiKey,
-      );
+      const storageClient = this.getClient();
       await storageClient.deleteFile(bucketId, fileId);
 
       outputChannel.success("[STORAGE]", "File deleted", `File ${fileId}`);

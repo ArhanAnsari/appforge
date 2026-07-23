@@ -161,6 +161,13 @@ It solves the problems that usually show up in real Appwrite workflows:
 
 ## ✨ What's New in v0.2.2-alpha
 
+### 🗄️ Multi-Project Database Discovery & Webview Viewer
+
+- **Isolated Project Clients**: Each saved project node now runs requests on an isolated SDK client instance, preventing API key/project ID cross-contamination across workspaces.
+- **Appwrite Server v27+ Parity**: Native detection and extraction support for `TablesDB` and standard `Databases` API responses.
+- **Interactive Database Viewer**: Click on any collection or table node in the sidebar to open the full-screen editor tab displaying document rows, column attributes, system fields (`$id`, `$createdAt`), real-time search filtering, and document actions.
+- **Actionable Diagnostic Trees**: Permission or API Key issues now display clear status messages (e.g., `🔑 No API key saved` or `❌ Missing scope: databases.read`) directly on the tree node.
+
 ### ✅ Production Reliability Audit & Fixes
 
 This release focuses on production stability and architecture hardening across Cloud and Self-Hosted Appwrite deployments.

@@ -11,7 +11,7 @@ import {
   VariableItem,
   AppwriteProject,
 } from "../types";
-import { appwriteClientService } from "./appwriteClientService";
+import { AppwriteClientService } from "./appwriteClientService";
 import { outputChannel } from "../core/output/outputChannel";
 import { extractObjectArrayWithId } from "../utils/responseParser";
 
@@ -21,15 +21,20 @@ export class FunctionsService {
     private apiKey: string,
   ) {}
 
+  private getClient(): Functions {
+    const instance = AppwriteClientService.getInstance();
+    if (!instance) {
+      throw new Error("Appwrite client instance is not initialized.");
+    }
+    return instance.createFunctionsService(this.project, this.apiKey);
+  }
+
   /**
    * List all functions for the project
    */
   async listFunctions(): Promise<FunctionItem[]> {
     try {
-      const fnClient = appwriteClientService.createFunctionsService(
-        this.project,
-        this.apiKey,
-      );
+      const fnClient = this.getClient();
       const response = await fnClient.list();
       const functions = extractObjectArrayWithId(response);
 
@@ -55,10 +60,7 @@ export class FunctionsService {
    */
   async getFunction(functionId: string): Promise<FunctionItem> {
     try {
-      const fnClient = appwriteClientService.createFunctionsService(
-        this.project,
-        this.apiKey,
-      );
+      const fnClient = this.getClient();
       const fn = await fnClient.get(functionId);
 
       return {
@@ -83,10 +85,7 @@ export class FunctionsService {
    */
   async listDeployments(functionId: string): Promise<DeploymentItem[]> {
     try {
-      const fnClient = appwriteClientService.createFunctionsService(
-        this.project,
-        this.apiKey,
-      );
+      const fnClient = this.getClient();
       const response = await fnClient.listDeployments(functionId);
       const deployments = extractObjectArrayWithId(response);
 
@@ -112,10 +111,7 @@ export class FunctionsService {
    */
   async listExecutions(functionId: string): Promise<ExecutionItem[]> {
     try {
-      const fnClient = appwriteClientService.createFunctionsService(
-        this.project,
-        this.apiKey,
-      );
+      const fnClient = this.getClient();
       const response = await fnClient.listExecutions(functionId);
       const executions = extractObjectArrayWithId(response);
 
@@ -146,10 +142,7 @@ export class FunctionsService {
    */
   async listVariables(functionId: string): Promise<VariableItem[]> {
     try {
-      const fnClient = appwriteClientService.createFunctionsService(
-        this.project,
-        this.apiKey,
-      );
+      const fnClient = this.getClient();
       const response = await fnClient.listVariables(functionId);
       const variables = extractObjectArrayWithId(response);
 
@@ -176,10 +169,7 @@ export class FunctionsService {
     async?: boolean,
   ): Promise<ExecutionItem> {
     try {
-      const fnClient = appwriteClientService.createFunctionsService(
-        this.project,
-        this.apiKey,
-      );
+      const fnClient = this.getClient();
       const execution = await fnClient.createExecution(functionId, data, async);
 
       outputChannel.success(
